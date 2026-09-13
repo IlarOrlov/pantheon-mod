@@ -80,11 +80,14 @@ public final class SharedStats {
 			// gets a fresh entity instance with no recorded "previous" value -
 			// indistinguishable, by that alone, from a brand new joiner who
 			// should instead *adopt* the pool - so instead of comparing against
-			// history here, just watch for the first player who's alive again:
-			// that's the revival signal, and it becomes the new pool value
-			// rather than getting immediately pulled back down to the lethal one.
+			// history here, just watch for the first player with real positive
+			// health again: that's the revival signal, and it becomes the new
+			// pool value rather than getting immediately pulled back down to
+			// the lethal one. (Entity#isAlive() is just "not removed" - a player
+			// sitting on the death screen, not yet respawned, is still "alive"
+			// by that definition, so it can't be used to detect this.)
 			for (ServerPlayer player : online) {
-				if (player.isAlive()) {
+				if (player.getHealth() > 0f) {
 					sharedHealth = player.getHealth();
 					sharedDeathHandled = false;
 					break;
@@ -111,13 +114,18 @@ public final class SharedStats {
 
 		for (ServerPlayer player : online) {
 			lastSyncedHealth.put(player.getUUID(), sharedHealth);
-			if (!player.isAlive()) {
+			float currentHealth = player.getHealth();
+			if (currentHealth <= 0f) {
+				// Already dead and awaiting their own respawn click - forcing
+				// setHealth on them wouldn't actually respawn them, just leave
+				// health and death-screen state inconsistent. Leave them alone;
+				// they'll fall into the branch above once they do respawn.
 				continue;
 			}
 			if (sharedHealth <= 0f) {
 				player.setHealth(0f);
 				player.die(player.damageSources().generic());
-			} else if (player.getHealth() != sharedHealth) {
+			} else if (currentHealth != sharedHealth) {
 				player.setHealth(Math.min(sharedHealth, player.getMaxHealth()));
 			}
 		}
