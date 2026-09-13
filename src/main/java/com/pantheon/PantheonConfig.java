@@ -31,7 +31,6 @@ public final class PantheonConfig {
 	private static volatile PantheonConfig instance = new PantheonConfig();
 	private static Path configPath;
 
-	public boolean syncCraftingGrid = true;
 	public boolean syncArmor = true;
 	public boolean syncOffhand = true;
 	public boolean enableHotbarOwnership = false;
@@ -86,7 +85,6 @@ public final class PantheonConfig {
 
 	public PantheonConfig copy() {
 		PantheonConfig copy = new PantheonConfig();
-		copy.syncCraftingGrid = this.syncCraftingGrid;
 		copy.syncArmor = this.syncArmor;
 		copy.syncOffhand = this.syncOffhand;
 		copy.enableHotbarOwnership = this.enableHotbarOwnership;

@@ -43,13 +43,12 @@ public final class PantheonOptionsScreen extends Screen {
 		content.defaultCellSetting().alignHorizontallyCenter();
 
 		content.addChild(sectionLabel("What's shared"));
-		content.addChild(toggleRow("Crafting grid", this.working.syncCraftingGrid, v -> this.working.syncCraftingGrid = v));
 		content.addChild(toggleRow("Armor", this.working.syncArmor, v -> this.working.syncArmor = v));
 		content.addChild(toggleRow("Offhand", this.working.syncOffhand, v -> this.working.syncOffhand = v));
 
 		content.addChild(spacer());
 		content.addChild(sectionLabel("Hotbar ownership"));
-		content.addChild(toggleRow("Lock each player's selected slot (caps server at 9 players)",
+		content.addChild(toggleRow("Item bar slot ownership (9 players maximum)",
 			this.working.enableHotbarOwnership, v -> this.working.enableHotbarOwnership = v));
 
 		LinearLayout footer = this.layout.addToFooter(LinearLayout.horizontal().spacing(8));

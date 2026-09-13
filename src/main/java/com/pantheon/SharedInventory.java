@@ -19,9 +19,6 @@ public final class SharedInventory {
 	/** Armor + offhand, shared per-slot-type when {@link PantheonConfig} enables it. */
 	public static final EnumMap<EquipmentSlot, ItemStack> SHARED_EQUIPMENT = new EnumMap<>(EquipmentSlot.class);
 
-	/** The survival-inventory 2x2 crafting grid, shared when {@link PantheonConfig#syncCraftingGrid} is on. */
-	public static final NonNullList<ItemStack> CRAFTING_ITEMS = NonNullList.withSize(4, ItemStack.EMPTY);
-
 	static {
 		for (EquipmentSlot slot : EquipmentSlot.values()) {
 			SHARED_EQUIPMENT.put(slot, ItemStack.EMPTY);
@@ -34,9 +31,6 @@ public final class SharedInventory {
 	public static void reset() {
 		for (int i = 0; i < ITEMS.size(); i++) {
 			ITEMS.set(i, ItemStack.EMPTY);
-		}
-		for (int i = 0; i < CRAFTING_ITEMS.size(); i++) {
-			CRAFTING_ITEMS.set(i, ItemStack.EMPTY);
 		}
 		for (EquipmentSlot slot : EquipmentSlot.values()) {
 			SHARED_EQUIPMENT.put(slot, ItemStack.EMPTY);

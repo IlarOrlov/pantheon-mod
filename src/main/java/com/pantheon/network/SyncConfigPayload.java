@@ -15,7 +15,6 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
  * server's actual behavior.
  */
 public record SyncConfigPayload(
-	boolean syncCraftingGrid,
 	boolean syncArmor,
 	boolean syncOffhand,
 	boolean enableHotbarOwnership
@@ -23,7 +22,6 @@ public record SyncConfigPayload(
 	public static final CustomPacketPayload.Type<SyncConfigPayload> TYPE = new CustomPacketPayload.Type<>(PantheonMod.id("sync_config"));
 
 	public static final StreamCodec<RegistryFriendlyByteBuf, SyncConfigPayload> CODEC = StreamCodec.composite(
-		ByteBufCodecs.BOOL, SyncConfigPayload::syncCraftingGrid,
 		ByteBufCodecs.BOOL, SyncConfigPayload::syncArmor,
 		ByteBufCodecs.BOOL, SyncConfigPayload::syncOffhand,
 		ByteBufCodecs.BOOL, SyncConfigPayload::enableHotbarOwnership,
@@ -32,7 +30,6 @@ public record SyncConfigPayload(
 
 	public static SyncConfigPayload fromConfig(final PantheonConfig config) {
 		return new SyncConfigPayload(
-			config.syncCraftingGrid,
 			config.syncArmor,
 			config.syncOffhand,
 			config.enableHotbarOwnership
@@ -41,7 +38,6 @@ public record SyncConfigPayload(
 
 	public PantheonConfig toConfig() {
 		PantheonConfig config = new PantheonConfig();
-		config.syncCraftingGrid = this.syncCraftingGrid;
 		config.syncArmor = this.syncArmor;
 		config.syncOffhand = this.syncOffhand;
 		config.enableHotbarOwnership = this.enableHotbarOwnership;

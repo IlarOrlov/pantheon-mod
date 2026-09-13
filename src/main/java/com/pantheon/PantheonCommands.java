@@ -25,7 +25,7 @@ public final class PantheonCommands {
 	}
 
 	private static final SuggestionProvider<CommandSourceStack> SETTING_NAMES = (context, builder) -> {
-		for (String name : new String[] {"syncCraftingGrid", "syncArmor", "syncOffhand", "enableHotbarOwnership"}) {
+		for (String name : new String[] {"syncArmor", "syncOffhand", "enableHotbarOwnership"}) {
 			builder.suggest(name);
 		}
 		return builder.buildFuture();
@@ -56,8 +56,7 @@ public final class PantheonCommands {
 	private static int showConfig(final com.mojang.brigadier.context.CommandContext<CommandSourceStack> context) {
 		PantheonConfig config = PantheonConfig.get();
 		context.getSource().sendSuccess(() -> Component.literal(
-			"syncCraftingGrid=" + config.syncCraftingGrid
-				+ ", syncArmor=" + config.syncArmor
+			"syncArmor=" + config.syncArmor
 				+ ", syncOffhand=" + config.syncOffhand
 				+ ", enableHotbarOwnership=" + config.enableHotbarOwnership
 		), false);
@@ -72,7 +71,6 @@ public final class PantheonCommands {
 		PantheonConfig config = PantheonConfig.get().copy();
 		try {
 			switch (setting) {
-				case "syncCraftingGrid" -> config.syncCraftingGrid = Boolean.parseBoolean(value);
 				case "syncArmor" -> config.syncArmor = Boolean.parseBoolean(value);
 				case "syncOffhand" -> config.syncOffhand = Boolean.parseBoolean(value);
 				case "enableHotbarOwnership" -> config.enableHotbarOwnership = Boolean.parseBoolean(value);

@@ -8,7 +8,6 @@ import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElement;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
-import net.minecraft.client.multiplayer.PlayerInfo;
 
 /**
  * Draws a colored frame around each hotbar slot that {@link PantheonModClient}
@@ -41,15 +40,6 @@ public final class HotbarOwnerOverlay implements HudElement {
 			int x = left + slot * SLOT_SIZE;
 			int color = HotbarColors.colorFor(owner);
 			drawFrame(graphics, x, top, SLOT_SIZE, SLOT_SIZE, color);
-
-			PlayerInfo info = minecraft.getConnection().getPlayerInfo(owner);
-			if (info != null) {
-				String name = info.getProfile().name();
-				if (!name.isEmpty()) {
-					String initial = name.substring(0, 1).toUpperCase();
-					graphics.text(minecraft.font, initial, x + 6, top - 10, color);
-				}
-			}
 		}
 	}
 
