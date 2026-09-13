@@ -53,8 +53,7 @@ public final class PantheonOptionsScreen extends Screen {
 
 		content.addChild(spacer());
 		content.addChild(sectionLabel("Shared vitals"));
-		content.addChild(toggleRow("Share health (one pool for the whole server - if it hits 0, everyone dies)",
-			this.working.syncHealth, v -> this.working.syncHealth = v));
+		content.addChild(toggleRow("Share health toggle", this.working.syncHealth, v -> this.working.syncHealth = v));
 		content.addChild(toggleRow("Share hunger", this.working.syncHunger, v -> this.working.syncHunger = v));
 
 		LinearLayout footer = this.layout.addToFooter(LinearLayout.horizontal().spacing(8));

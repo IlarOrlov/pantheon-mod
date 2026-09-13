@@ -54,6 +54,39 @@ public final class HotbarOwnership {
 		return owners;
 	}
 
+	/**
+	 * If {@code player}'s currently selected slot (loaded from their own save
+	 * data, or just wherever they left off) is already owned by a different
+	 * online player, moves them to the first free slot instead of contending
+	 * for an occupied one. With the {@link PantheonConfig#HOTBAR_OWNERSHIP_PLAYER_CAP}
+	 * join limit in place there's always at least one free slot for a player
+	 * who just successfully joined.
+	 */
+	public static void resolveJoinConflict(final MinecraftServer server, final ServerPlayer player) {
+		if (!PantheonConfig.get().enableHotbarOwnership) {
+			return;
+		}
+
+		List<UUID> owners = currentOwners(server);
+		int mySlot = player.getInventory().getSelectedSlot();
+		if (mySlot < 0 || mySlot >= HotbarOwnersPayload.SLOT_COUNT) {
+			return;
+		}
+
+		UUID owner = owners.get(mySlot);
+		if (owner.equals(HotbarOwnersPayload.NO_OWNER) || owner.equals(player.getUUID())) {
+			return;
+		}
+
+		for (int i = 0; i < HotbarOwnersPayload.SLOT_COUNT; i++) {
+			UUID other = owners.get(i);
+			if (other.equals(HotbarOwnersPayload.NO_OWNER) || other.equals(player.getUUID())) {
+				player.getInventory().setSelectedSlot(i);
+				return;
+			}
+		}
+	}
+
 	/** Recomputes ownership and, only if it changed since the last check, pushes it to every client. */
 	public static void tick(final MinecraftServer server) {
 		List<UUID> owners = currentOwners(server);
