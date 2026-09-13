@@ -1,6 +1,5 @@
 package com.pantheon.client;
 
-import java.util.List;
 import java.util.UUID;
 
 import com.pantheon.network.HotbarOwnersPayload;
@@ -30,13 +29,11 @@ public final class HotbarOwnerOverlay implements HudElement {
 			return;
 		}
 
-		List<UUID> owners = PantheonModClient.getHotbarOwners();
-
 		int left = graphics.guiWidth() / 2 - HOTBAR_WIDTH / 2;
 		int top = graphics.guiHeight() - SLOT_SIZE - 1;
 
-		for (int slot = 0; slot < owners.size() && slot < HotbarOwnersPayload.SLOT_COUNT; slot++) {
-			UUID owner = owners.get(slot);
+		for (int slot = 0; slot < HotbarOwnersPayload.SLOT_COUNT; slot++) {
+			UUID owner = PantheonModClient.effectiveOwner(slot);
 			if (owner.equals(HotbarOwnersPayload.NO_OWNER)) {
 				continue;
 			}

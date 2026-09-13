@@ -77,6 +77,26 @@ public class PantheonModClient implements ClientModInitializer {
 		return !owner.equals(HotbarOwnersPayload.NO_OWNER) && !owner.equals(minecraft.player.getUUID());
 	}
 
+	/**
+	 * The owner to render for {@code slot} right now. Selecting your own
+	 * hotbar slot is instant/client-predicted (the vanilla selection outline
+	 * moves the moment you scroll or press a number key), but the server
+	 * broadcast confirming *we* now own that slot takes a network round trip
+	 * - without this, our lock frame would visibly lag a tick or two behind
+	 * that outline. Since we already know locally which slot we've selected,
+	 * predict our own frame immediately and only defer to the broadcast for
+	 * everyone else's slots.
+	 */
+	public static UUID effectiveOwner(final int slot) {
+		Minecraft minecraft = Minecraft.getInstance();
+		if (minecraft.player != null
+			&& lastKnownConfig.enableHotbarOwnership
+			&& slot == minecraft.player.getInventory().getSelectedSlot()) {
+			return minecraft.player.getUUID();
+		}
+		return (slot >= 0 && slot < hotbarOwners.size()) ? hotbarOwners.get(slot) : HotbarOwnersPayload.NO_OWNER;
+	}
+
 	private static List<UUID> emptyOwners() {
 		List<UUID> owners = new ArrayList<>(HotbarOwnersPayload.SLOT_COUNT);
 		for (int i = 0; i < HotbarOwnersPayload.SLOT_COUNT; i++) {
