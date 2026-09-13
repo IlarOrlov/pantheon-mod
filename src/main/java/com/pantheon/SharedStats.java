@@ -74,25 +74,39 @@ public final class SharedStats {
 		}
 		lastSyncedHealth.keySet().retainAll(uuids(online));
 
-		ServerPlayer sourceOfChange = null;
-		for (ServerPlayer player : online) {
-			Float previous = lastSyncedHealth.get(player.getUUID());
-			if (previous != null && previous.floatValue() != player.getHealth()) {
-				sharedHealth = player.getHealth();
-				sourceOfChange = player;
+		if (sharedHealth != null && sharedHealth <= 0f) {
+			// Settled dead-pool state: everyone who was online got killed for it
+			// already, so don't force anyone down further. A respawning player
+			// gets a fresh entity instance with no recorded "previous" value -
+			// indistinguishable, by that alone, from a brand new joiner who
+			// should instead *adopt* the pool - so instead of comparing against
+			// history here, just watch for the first player who's alive again:
+			// that's the revival signal, and it becomes the new pool value
+			// rather than getting immediately pulled back down to the lethal one.
+			for (ServerPlayer player : online) {
+				if (player.isAlive()) {
+					sharedHealth = player.getHealth();
+					sharedDeathHandled = false;
+					break;
+				}
 			}
-		}
-		if (sharedHealth == null) {
-			sharedHealth = online.get(0).getHealth();
-		}
+		} else {
+			ServerPlayer sourceOfChange = null;
+			for (ServerPlayer player : online) {
+				Float previous = lastSyncedHealth.get(player.getUUID());
+				if (previous != null && previous.floatValue() != player.getHealth()) {
+					sharedHealth = player.getHealth();
+					sourceOfChange = player;
+				}
+			}
+			if (sharedHealth == null) {
+				sharedHealth = online.get(0).getHealth();
+			}
 
-		if (sharedHealth <= 0f) {
-			if (!sharedDeathHandled) {
+			if (sharedHealth <= 0f && !sharedDeathHandled) {
 				dropSharedInventoryOnce(sourceOfChange != null ? sourceOfChange : online.get(0));
 				sharedDeathHandled = true;
 			}
-		} else {
-			sharedDeathHandled = false;
 		}
 
 		for (ServerPlayer player : online) {
