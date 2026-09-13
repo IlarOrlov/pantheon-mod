@@ -10,6 +10,7 @@ import java.util.UUID;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.item.ItemStack;
 
 /**
  * Shares current health and/or hunger across every online player, each
@@ -23,9 +24,14 @@ import net.minecraft.server.level.ServerPlayer;
  * applied to everyone else.
  *
  * <p>When {@link PantheonConfig#syncHealth} is on, a shared health pool
- * reaching 0 kills every online player at once (going through the normal
- * death pipeline via {@link net.minecraft.world.entity.Entity#kill}, so the
- * forced {@code keepInventory} rule still prevents any item drops).
+ * reaching 0 kills every online player at once, through the real death
+ * pipeline ({@code setHealth(0)} + {@link net.minecraft.world.entity.LivingEntity#die})
+ * so respawning actually works - {@code Entity#kill} looked tempting but only
+ * force-removes the entity, without ever presenting a respawn screen. The
+ * shared inventory is dropped and cleared exactly once for the whole event
+ * (not once per dying player, which would duplicate every item), since
+ * {@code keepInventory} being forced on would otherwise just let it survive
+ * a death that's supposed to actually end the run.
  */
 public final class SharedStats {
 	private SharedStats() {
@@ -33,6 +39,7 @@ public final class SharedStats {
 
 	private static Float sharedHealth;
 	private static final Map<UUID, Float> lastSyncedHealth = new HashMap<>();
+	private static boolean sharedDeathHandled;
 
 	private static Integer sharedFood;
 	private static Float sharedSaturation;
@@ -47,6 +54,7 @@ public final class SharedStats {
 			tickHealth(online);
 		} else if (sharedHealth != null) {
 			sharedHealth = null;
+			sharedDeathHandled = false;
 			lastSyncedHealth.clear();
 		}
 
@@ -66,14 +74,25 @@ public final class SharedStats {
 		}
 		lastSyncedHealth.keySet().retainAll(uuids(online));
 
+		ServerPlayer sourceOfChange = null;
 		for (ServerPlayer player : online) {
 			Float previous = lastSyncedHealth.get(player.getUUID());
 			if (previous != null && previous.floatValue() != player.getHealth()) {
 				sharedHealth = player.getHealth();
+				sourceOfChange = player;
 			}
 		}
 		if (sharedHealth == null) {
 			sharedHealth = online.get(0).getHealth();
+		}
+
+		if (sharedHealth <= 0f) {
+			if (!sharedDeathHandled) {
+				dropSharedInventoryOnce(sourceOfChange != null ? sourceOfChange : online.get(0));
+				sharedDeathHandled = true;
+			}
+		} else {
+			sharedDeathHandled = false;
 		}
 
 		for (ServerPlayer player : online) {
@@ -82,9 +101,22 @@ public final class SharedStats {
 				continue;
 			}
 			if (sharedHealth <= 0f) {
-				player.kill((ServerLevel) player.level());
+				player.setHealth(0f);
+				player.die(player.damageSources().generic());
 			} else if (player.getHealth() != sharedHealth) {
 				player.setHealth(Math.min(sharedHealth, player.getMaxHealth()));
+			}
+		}
+	}
+
+	/** Drops the shared inventory's contents once (not per dying player, to avoid duplicating every item) and clears it. */
+	private static void dropSharedInventoryOnce(final ServerPlayer anchor) {
+		ServerLevel level = (ServerLevel) anchor.level();
+		for (int i = 0; i < SharedInventory.ITEMS.size(); i++) {
+			ItemStack stack = SharedInventory.ITEMS.get(i);
+			if (!stack.isEmpty()) {
+				anchor.spawnAtLocation(level, stack);
+				SharedInventory.ITEMS.set(i, ItemStack.EMPTY);
 			}
 		}
 	}
