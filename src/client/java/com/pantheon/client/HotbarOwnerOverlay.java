@@ -24,7 +24,10 @@ public final class HotbarOwnerOverlay implements HudElement {
 	@Override
 	public void extractRenderState(final GuiGraphicsExtractor graphics, final DeltaTracker deltaTracker) {
 		Minecraft minecraft = Minecraft.getInstance();
-		if (minecraft.player == null || minecraft.getConnection() == null) {
+		if (minecraft.player == null || minecraft.getConnection() == null || minecraft.gui.screen() != null) {
+			// A container screen (inventory, chest, ...) is open - that already
+			// draws its own lock frames over the hotbar row via HotbarLockFrameMixin;
+			// this HUD element isn't hidden automatically while a screen covers it.
 			return;
 		}
 
