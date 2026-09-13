@@ -29,12 +29,6 @@ import net.minecraft.world.inventory.Slot;
 @Mixin(AbstractContainerScreen.class)
 public abstract class HotbarLockFrameMixin {
 	@Shadow
-	protected int leftPos;
-
-	@Shadow
-	protected int topPos;
-
-	@Shadow
 	@Final
 	protected AbstractContainerMenu menu;
 
@@ -63,8 +57,12 @@ public abstract class HotbarLockFrameMixin {
 			}
 
 			int color = HotbarColors.colorFor(owner);
-			int x = this.leftPos + slot.x - 1;
-			int y = this.topPos + slot.y - 1;
+			// extractSlots() runs inside a render matrix already translated by
+			// (leftPos, topPos) - see AbstractContainerScreen#extractContents -
+			// so slot.x/slot.y alone are already correct here; adding leftPos/topPos
+			// again double-shifts the frame down and to the right of the real slot.
+			int x = slot.x - 1;
+			int y = slot.y - 1;
 			graphics.fill(x, y, x + 18, y + 1, color);
 			graphics.fill(x, y + 17, x + 18, y + 18, color);
 			graphics.fill(x, y, x + 1, y + 18, color);
