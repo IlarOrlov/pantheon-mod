@@ -1,0 +1,39 @@
+{
+	"schemaVersion": 1,
+	"id": "pantheon",
+	"version": "${version}",
+	"name": "Pantheon",
+	"description": "One inventory, shared by every player on the server. Everyone reads and writes the same 36 storage slots, 4 armor slots, offhand and hotbar -- pick something up as one player and everyone can use it. Each hotbar slot also shows a small color/name tag for whichever player is currently \"assigned\" to it, purely as a visual identifier.",
+	"authors": [
+		"Ilar Orlov (Feanor)"
+	],
+	"contact": {
+		"homepage": "https://github.com/IlarOrlov/pantheon-mod",
+		"sources": "https://github.com/IlarOrlov/pantheon-mod",
+		"issues": "https://github.com/IlarOrlov/pantheon-mod/issues"
+	},
+	"license": "CC0-1.0",
+	"icon": "assets/pantheon/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"com.pantheon.PantheonMod"
+		],
+		"client": [
+			"com.pantheon.client.PantheonModClient"
+		]
+	},
+	"mixins": [
+		"pantheon.mixins.json",
+		{
+			"config": "pantheon.client.mixins.json",
+			"environment": "client"
+		}
+	],
+	"depends": {
+		"fabricloader": ">=0.19.5",
+		"minecraft": "~26.2",
+		"java": ">=25",
+		"fabric-api": "*"
+	}
+}
