@@ -3,7 +3,7 @@
 	"id": "pantheon",
 	"version": "${version}",
 	"name": "Pantheon",
-	"description": "One inventory, shared by every player on the server. Everyone reads and writes the same 36 storage slots, 4 armor slots, offhand and hotbar -- pick something up as one player and everyone can use it. Each hotbar slot also shows a small color/name tag for whichever player is currently \"assigned\" to it, purely as a visual identifier.",
+	"description": "One inventory, shared by every player on the server. Everyone reads and writes the same 36 storage slots, and optionally the crafting grid, armor and offhand too. Optionally, each hotbar slot can be exclusively owned by one player at a time (shown as a colored frame around it) so nobody else can touch it while they're using it. Configurable via the /pantheon command or the in-game settings screen.",
 	"authors": [
 		"Ilar Orlov (Feanor)"
 	],

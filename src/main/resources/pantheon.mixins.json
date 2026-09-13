@@ -3,9 +3,11 @@
 	"package": "com.pantheon.mixin",
 	"compatibilityLevel": "JAVA_25",
 	"mixins": [
-		"EntityEquipmentAccessor",
 		"InventorySharingMixin",
-		"EquipmentSharingMixin"
+		"EquipmentSharingMixin",
+		"CraftingGridSharingMixin",
+		"HotbarLockMixin",
+		"HotbarOwnershipCapMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

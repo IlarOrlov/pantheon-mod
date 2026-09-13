@@ -1,34 +1,46 @@
 package com.pantheon.mixin;
 
+import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import com.pantheon.SharedInventory;
+import com.pantheon.PantheonConfig;
 
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.player.PlayerEquipment;
+import net.minecraft.world.item.ItemStack;
 
 /**
- * Shares armor/offhand (everything except mainhand, which PlayerEquipment
- * already routes through the player's own Inventory#getSelectedItem) across
- * every ServerPlayer by pointing their equipment map at the same backing map.
- *
- * <p>The backing "items" map is declared on EntityEquipment, not on
- * PlayerEquipment itself, so it is reached through {@link EntityEquipmentAccessor}
- * (applied to EntityEquipment, and therefore inherited here) rather than a
- * direct {@code @Shadow}, which Mixin does not resolve across superclasses.
+ * Redirects armor and offhand reads/writes to {@link SharedInventory#SHARED_EQUIPMENT}
+ * whenever {@link PantheonConfig} says that slot type should be shared, so
+ * armor/offhand toggle independently and can be flipped live without
+ * reconnecting. Mainhand is untouched here - {@link PlayerEquipment} already
+ * routes it through the (always-shared) {@link com.pantheon.mixin.InventorySharingMixin}.
  */
 @Mixin(PlayerEquipment.class)
 public abstract class EquipmentSharingMixin {
-	@Inject(method = "<init>", at = @At("TAIL"))
-	private void pantheon$shareEquipment(final Player player, final CallbackInfo ci) {
-		if (player instanceof ServerPlayer) {
-			EntityEquipmentAccessor self = (EntityEquipmentAccessor) (Object) this;
-			EntityEquipmentAccessor shared = (EntityEquipmentAccessor) SharedInventory.EQUIPMENT;
-			self.pantheon$setItems(shared.pantheon$getItems());
+	@Shadow
+	@Final
+	private Player player;
+
+	@Inject(method = "get", at = @At("HEAD"), cancellable = true)
+	private void pantheon$get(final EquipmentSlot slot, final CallbackInfoReturnable<ItemStack> cir) {
+		if (this.player instanceof ServerPlayer && PantheonConfig.get().isEquipmentSlotShared(slot)) {
+			cir.setReturnValue(SharedInventory.SHARED_EQUIPMENT.getOrDefault(slot, ItemStack.EMPTY));
+		}
+	}
+
+	@Inject(method = "set", at = @At("HEAD"), cancellable = true)
+	private void pantheon$set(final EquipmentSlot slot, final ItemStack stack, final CallbackInfoReturnable<ItemStack> cir) {
+		if (this.player instanceof ServerPlayer && PantheonConfig.get().isEquipmentSlotShared(slot)) {
+			ItemStack previous = SharedInventory.SHARED_EQUIPMENT.put(slot, stack == null ? ItemStack.EMPTY : stack);
+			cir.setReturnValue(previous == null ? ItemStack.EMPTY : previous);
 		}
 	}
 }

@@ -12,12 +12,14 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 
 /**
- * Sent from server to every client whenever the set of online players changes.
- * Carries exactly {@link #SLOT_COUNT} entries, one per hotbar slot; an entry
- * equal to {@link #NO_OWNER} means that slot currently has no player tagged
- * to it. Purely cosmetic - it never affects who can use which slot.
+ * Sent from server to every client whenever the set of online players
+ * changes, or (in {@link com.pantheon.PantheonConfig.HotbarOwnershipMode#SELECTED}
+ * mode) whenever anyone's selected hotbar slot changes. Carries exactly
+ * {@link #SLOT_COUNT} entries per list, one per hotbar slot; an owner equal to
+ * {@link #NO_OWNER} means that slot currently has no player locked to it, and
+ * its color entry is meaningless.
  */
-public record HotbarOwnersPayload(List<UUID> owners) implements CustomPacketPayload {
+public record HotbarOwnersPayload(List<UUID> owners, List<Integer> colors) implements CustomPacketPayload {
 	public static final int SLOT_COUNT = 9;
 	public static final UUID NO_OWNER = new UUID(0L, 0L);
 
@@ -26,6 +28,8 @@ public record HotbarOwnersPayload(List<UUID> owners) implements CustomPacketPayl
 	public static final StreamCodec<RegistryFriendlyByteBuf, HotbarOwnersPayload> CODEC = StreamCodec.composite(
 		UUIDUtil.STREAM_CODEC.apply(ByteBufCodecs.list(SLOT_COUNT)),
 		HotbarOwnersPayload::owners,
+		ByteBufCodecs.INT.apply(ByteBufCodecs.list(SLOT_COUNT)),
+		HotbarOwnersPayload::colors,
 		HotbarOwnersPayload::new
 	);
 

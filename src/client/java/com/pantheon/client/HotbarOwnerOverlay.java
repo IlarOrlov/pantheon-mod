@@ -12,15 +12,16 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.multiplayer.PlayerInfo;
 
 /**
- * Draws a small colored tag (and the owning player's initial) above each
- * hotbar slot that is currently "assigned" to a player. Purely decorative -
- * every slot still works for every player regardless of this overlay.
+ * Draws a colored frame around each hotbar slot that {@link PantheonModClient}
+ * currently reports as "owned" by another online player - the same color
+ * shown around that slot for every other player - so nobody can miss which
+ * slots are off-limits to them right now. Purely decorative: the actual lock
+ * is enforced server-side by {@code com.pantheon.mixin.HotbarLockMixin}.
  */
 public final class HotbarOwnerOverlay implements HudElement {
-	private static final int[] SLOT_COLORS = {
-		0xFFE6194B, 0xFF3CB44B, 0xFFFFE119, 0xFF4363D8, 0xFFF58231,
-		0xFF911EB4, 0xFF46F0F0, 0xFFF032E6, 0xFFBFEF45
-	};
+	private static final int SLOT_SIZE = 20;
+	private static final int HOTBAR_WIDTH = SLOT_SIZE * HotbarOwnersPayload.SLOT_COUNT;
+	private static final int BORDER_THICKNESS = 2;
 
 	@Override
 	public void extractRenderState(final GuiGraphicsExtractor graphics, final DeltaTracker deltaTracker) {
@@ -30,8 +31,10 @@ public final class HotbarOwnerOverlay implements HudElement {
 		}
 
 		List<UUID> owners = PantheonModClient.getHotbarOwners();
-		int screenCenter = graphics.guiWidth() / 2;
-		int y = graphics.guiHeight() - 16 - 3;
+		List<Integer> colors = PantheonModClient.getHotbarOwnerColors();
+
+		int left = graphics.guiWidth() / 2 - HOTBAR_WIDTH / 2;
+		int top = graphics.guiHeight() - SLOT_SIZE - 1;
 
 		for (int slot = 0; slot < owners.size() && slot < HotbarOwnersPayload.SLOT_COUNT; slot++) {
 			UUID owner = owners.get(slot);
@@ -39,19 +42,25 @@ public final class HotbarOwnerOverlay implements HudElement {
 				continue;
 			}
 
-			int x = screenCenter - 90 + slot * 20 + 2;
-			int color = SLOT_COLORS[slot % SLOT_COLORS.length];
-
-			graphics.fill(x, y - 4, x + 16, y - 1, color);
+			int x = left + slot * SLOT_SIZE;
+			int color = HotbarColors.colorFor(colors.get(slot));
+			drawFrame(graphics, x, top, SLOT_SIZE, SLOT_SIZE, color);
 
 			PlayerInfo info = minecraft.getConnection().getPlayerInfo(owner);
 			if (info != null) {
 				String name = info.getProfile().name();
 				if (!name.isEmpty()) {
 					String initial = name.substring(0, 1).toUpperCase();
-					graphics.text(minecraft.font, initial, x + 5, y - 14, 0xFFFFFFFF);
+					graphics.text(minecraft.font, initial, x + 6, top - 10, color);
 				}
 			}
 		}
+	}
+
+	static void drawFrame(final GuiGraphicsExtractor graphics, final int x, final int y, final int width, final int height, final int color) {
+		graphics.fill(x, y, x + width, y + BORDER_THICKNESS, color);
+		graphics.fill(x, y + height - BORDER_THICKNESS, x + width, y + height, color);
+		graphics.fill(x, y, x + BORDER_THICKNESS, y + height, color);
+		graphics.fill(x + width - BORDER_THICKNESS, y, x + width, y + height, color);
 	}
 }
