@@ -24,7 +24,13 @@ public final class HotbarOwnerOverlay implements HudElement {
 	@Override
 	public void extractRenderState(final GuiGraphicsExtractor graphics, final DeltaTracker deltaTracker) {
 		Minecraft minecraft = Minecraft.getInstance();
-		if (minecraft.player == null || minecraft.getConnection() == null) {
+		if (minecraft.player == null || minecraft.getConnection() == null || minecraft.gui.screen() != null) {
+			// This draws at a fixed spot near the bottom of the whole screen -
+			// the normal gameplay hotbar HUD position. Any open screen (inventory,
+			// chest, ...) has its own hotbar row drawn elsewhere (and gets its own
+			// correctly-positioned frames from HotbarLockFrameMixin), so this fixed
+			// HUD position should stay blank rather than show frames that don't
+			// line up with anything visible while a screen covers the game.
 			return;
 		}
 
