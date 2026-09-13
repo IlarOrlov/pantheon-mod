@@ -20,6 +20,18 @@ loom {
 			sourceSet sourceSets.client
 		}
 	}
+
+	runs {
+		// A second dev client with its own run directory and username, so it can
+		// be run alongside the default "runClient" to test shared-inventory
+		// behavior between two players without a duplicate-login kick.
+		client2 {
+			client()
+			configName = "Minecraft Client 2"
+			runDir "run/client2"
+			programArgs("--username", "TestPlayer2")
+		}
+	}
 }
 
 dependencies {
