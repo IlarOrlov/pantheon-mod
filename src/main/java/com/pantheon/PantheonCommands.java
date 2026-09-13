@@ -25,7 +25,7 @@ public final class PantheonCommands {
 	}
 
 	private static final SuggestionProvider<CommandSourceStack> SETTING_NAMES = (context, builder) -> {
-		for (String name : new String[] {"syncCraftingGrid", "syncArmor", "syncOffhand", "enableHotbarOwnership", "hotbarOwnershipMode"}) {
+		for (String name : new String[] {"syncCraftingGrid", "syncArmor", "syncOffhand", "enableHotbarOwnership"}) {
 			builder.suggest(name);
 		}
 		return builder.buildFuture();
@@ -60,7 +60,6 @@ public final class PantheonCommands {
 				+ ", syncArmor=" + config.syncArmor
 				+ ", syncOffhand=" + config.syncOffhand
 				+ ", enableHotbarOwnership=" + config.enableHotbarOwnership
-				+ ", hotbarOwnershipMode=" + config.hotbarOwnershipMode
 		), false);
 		return 1;
 	}
@@ -77,7 +76,6 @@ public final class PantheonCommands {
 				case "syncArmor" -> config.syncArmor = Boolean.parseBoolean(value);
 				case "syncOffhand" -> config.syncOffhand = Boolean.parseBoolean(value);
 				case "enableHotbarOwnership" -> config.enableHotbarOwnership = Boolean.parseBoolean(value);
-				case "hotbarOwnershipMode" -> config.hotbarOwnershipMode = PantheonConfig.HotbarOwnershipMode.valueOf(value.toUpperCase(java.util.Locale.ROOT));
 				default -> {
 					source.sendFailure(Component.literal("Unknown setting: " + setting));
 					return 0;

@@ -46,7 +46,6 @@ public abstract class HotbarLockFrameMixin {
 		}
 
 		List<UUID> owners = PantheonModClient.getHotbarOwners();
-		List<Integer> colors = PantheonModClient.getHotbarOwnerColors();
 		UUID self = minecraft.player.getUUID();
 
 		for (Slot slot : this.menu.slots) {
@@ -63,7 +62,7 @@ public abstract class HotbarLockFrameMixin {
 				continue;
 			}
 
-			int color = HotbarColors.colorFor(colors.get(index));
+			int color = HotbarColors.colorFor(owner);
 			int x = this.leftPos + slot.x - 1;
 			int y = this.topPos + slot.y - 1;
 			graphics.fill(x, y, x + 18, y + 1, color);

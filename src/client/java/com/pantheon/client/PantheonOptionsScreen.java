@@ -31,7 +31,7 @@ public final class PantheonOptionsScreen extends Screen {
 	@Override
 	protected void init() {
 		int centerX = this.width / 2;
-		int y = this.height / 2 - (ROW_HEIGHT * 3);
+		int y = this.height / 2 - (ROW_HEIGHT * 5 / 2);
 
 		this.addRenderableWidget(CycleButton.onOffBuilder(this.working.syncCraftingGrid)
 			.create(centerX - WIDGET_WIDTH / 2, y, WIDGET_WIDTH, 20, Component.literal("Sync crafting grid"),
@@ -51,14 +51,6 @@ public final class PantheonOptionsScreen extends Screen {
 		this.addRenderableWidget(CycleButton.onOffBuilder(this.working.enableHotbarOwnership)
 			.create(centerX - WIDGET_WIDTH / 2, y, WIDGET_WIDTH, 20, Component.literal("Hotbar slot ownership (caps server at 9 players)"),
 				(button, value) -> this.working.enableHotbarOwnership = value));
-		y += ROW_HEIGHT;
-
-		this.addRenderableWidget(CycleButton.<PantheonConfig.HotbarOwnershipMode>builder(
-				mode -> Component.literal(mode == PantheonConfig.HotbarOwnershipMode.SELECTED ? "Currently selected slot" : "Fixed per-player slot"),
-				this.working.hotbarOwnershipMode)
-			.withValues(PantheonConfig.HotbarOwnershipMode.SELECTED, PantheonConfig.HotbarOwnershipMode.FIXED)
-			.create(centerX - WIDGET_WIDTH / 2, y, WIDGET_WIDTH, 20, Component.literal("Ownership mode"),
-				(button, value) -> this.working.hotbarOwnershipMode = value));
 		y += ROW_HEIGHT * 2;
 
 		this.addRenderableWidget(Button.builder(Component.literal("Save"), button -> {

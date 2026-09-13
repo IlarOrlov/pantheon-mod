@@ -23,13 +23,6 @@ import net.minecraft.world.entity.EquipmentSlot;
  * through it) rather than being edited piecemeal.
  */
 public final class PantheonConfig {
-	public enum HotbarOwnershipMode {
-		/** The slot a player owns is whichever hotbar slot they currently have selected. */
-		SELECTED,
-		/** Each player is assigned one fixed slot for as long as they stay connected. */
-		FIXED
-	}
-
 	/** Slots on the server are capped at this many once hotbar ownership is enabled. */
 	public static final int HOTBAR_OWNERSHIP_PLAYER_CAP = 9;
 
@@ -42,7 +35,6 @@ public final class PantheonConfig {
 	public boolean syncArmor = true;
 	public boolean syncOffhand = true;
 	public boolean enableHotbarOwnership = false;
-	public HotbarOwnershipMode hotbarOwnershipMode = HotbarOwnershipMode.SELECTED;
 
 	public static PantheonConfig get() {
 		return instance;
@@ -98,7 +90,6 @@ public final class PantheonConfig {
 		copy.syncArmor = this.syncArmor;
 		copy.syncOffhand = this.syncOffhand;
 		copy.enableHotbarOwnership = this.enableHotbarOwnership;
-		copy.hotbarOwnershipMode = this.hotbarOwnershipMode;
 		return copy;
 	}
 }

@@ -19,8 +19,7 @@ public record UpdateConfigPayload(
 	boolean syncCraftingGrid,
 	boolean syncArmor,
 	boolean syncOffhand,
-	boolean enableHotbarOwnership,
-	PantheonConfig.HotbarOwnershipMode hotbarOwnershipMode
+	boolean enableHotbarOwnership
 ) implements CustomPacketPayload {
 	public static final CustomPacketPayload.Type<UpdateConfigPayload> TYPE = new CustomPacketPayload.Type<>(PantheonMod.id("update_config"));
 
@@ -29,11 +28,6 @@ public record UpdateConfigPayload(
 		ByteBufCodecs.BOOL, UpdateConfigPayload::syncArmor,
 		ByteBufCodecs.BOOL, UpdateConfigPayload::syncOffhand,
 		ByteBufCodecs.BOOL, UpdateConfigPayload::enableHotbarOwnership,
-		ByteBufCodecs.idMapper(
-			id -> PantheonConfig.HotbarOwnershipMode.values()[id],
-			PantheonConfig.HotbarOwnershipMode::ordinal
-		),
-		UpdateConfigPayload::hotbarOwnershipMode,
 		UpdateConfigPayload::new
 	);
 
@@ -42,8 +36,7 @@ public record UpdateConfigPayload(
 			config.syncCraftingGrid,
 			config.syncArmor,
 			config.syncOffhand,
-			config.enableHotbarOwnership,
-			config.hotbarOwnershipMode
+			config.enableHotbarOwnership
 		);
 	}
 
@@ -53,7 +46,6 @@ public record UpdateConfigPayload(
 		config.syncArmor = this.syncArmor;
 		config.syncOffhand = this.syncOffhand;
 		config.enableHotbarOwnership = this.enableHotbarOwnership;
-		config.hotbarOwnershipMode = this.hotbarOwnershipMode;
 		return config;
 	}
 

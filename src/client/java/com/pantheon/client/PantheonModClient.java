@@ -24,17 +24,13 @@ import net.minecraft.client.Minecraft;
 
 public class PantheonModClient implements ClientModInitializer {
 	private static volatile List<UUID> hotbarOwners = emptyOwners();
-	private static volatile List<Integer> hotbarOwnerColors = emptyColors();
 	private static volatile PantheonConfig lastKnownConfig = new PantheonConfig();
 
 	private static KeyMapping openSettingsKey;
 
 	@Override
 	public void onInitializeClient() {
-		ClientPlayNetworking.registerGlobalReceiver(HotbarOwnersPayload.TYPE, (payload, context) -> {
-			hotbarOwners = payload.owners();
-			hotbarOwnerColors = payload.colors();
-		});
+		ClientPlayNetworking.registerGlobalReceiver(HotbarOwnersPayload.TYPE, (payload, context) -> hotbarOwners = payload.owners());
 		ClientPlayNetworking.registerGlobalReceiver(SyncConfigPayload.TYPE, (payload, context) -> lastKnownConfig = payload.toConfig());
 
 		HudElementRegistry.attachElementAfter(VanillaHudElements.HOTBAR, PantheonMod.id("hotbar_owners"), new HotbarOwnerOverlay());
@@ -60,10 +56,6 @@ public class PantheonModClient implements ClientModInitializer {
 		return hotbarOwners;
 	}
 
-	public static List<Integer> getHotbarOwnerColors() {
-		return hotbarOwnerColors;
-	}
-
 	public static PantheonConfig getLastKnownConfig() {
 		return lastKnownConfig;
 	}
@@ -72,19 +64,24 @@ public class PantheonModClient implements ClientModInitializer {
 		ClientPlayNetworking.send(UpdateConfigPayload.fromConfig(config));
 	}
 
+	/** Whether {@code slot} is currently locked to some other online player (not us, not unowned). */
+	public static boolean isLockedToSomeoneElse(final int slot) {
+		if (slot < 0 || slot >= hotbarOwners.size()) {
+			return false;
+		}
+		Minecraft minecraft = Minecraft.getInstance();
+		if (minecraft.player == null) {
+			return false;
+		}
+		UUID owner = hotbarOwners.get(slot);
+		return !owner.equals(HotbarOwnersPayload.NO_OWNER) && !owner.equals(minecraft.player.getUUID());
+	}
+
 	private static List<UUID> emptyOwners() {
 		List<UUID> owners = new ArrayList<>(HotbarOwnersPayload.SLOT_COUNT);
 		for (int i = 0; i < HotbarOwnersPayload.SLOT_COUNT; i++) {
 			owners.add(HotbarOwnersPayload.NO_OWNER);
 		}
 		return owners;
-	}
-
-	private static List<Integer> emptyColors() {
-		List<Integer> colors = new ArrayList<>(HotbarOwnersPayload.SLOT_COUNT);
-		for (int i = 0; i < HotbarOwnersPayload.SLOT_COUNT; i++) {
-			colors.add(-1);
-		}
-		return colors;
 	}
 }

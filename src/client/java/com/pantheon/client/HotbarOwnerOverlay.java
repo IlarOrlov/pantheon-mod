@@ -31,7 +31,6 @@ public final class HotbarOwnerOverlay implements HudElement {
 		}
 
 		List<UUID> owners = PantheonModClient.getHotbarOwners();
-		List<Integer> colors = PantheonModClient.getHotbarOwnerColors();
 
 		int left = graphics.guiWidth() / 2 - HOTBAR_WIDTH / 2;
 		int top = graphics.guiHeight() - SLOT_SIZE - 1;
@@ -43,7 +42,7 @@ public final class HotbarOwnerOverlay implements HudElement {
 			}
 
 			int x = left + slot * SLOT_SIZE;
-			int color = HotbarColors.colorFor(colors.get(slot));
+			int color = HotbarColors.colorFor(owner);
 			drawFrame(graphics, x, top, SLOT_SIZE, SLOT_SIZE, color);
 
 			PlayerInfo info = minecraft.getConnection().getPlayerInfo(owner);

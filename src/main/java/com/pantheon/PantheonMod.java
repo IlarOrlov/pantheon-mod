@@ -42,10 +42,7 @@ public class PantheonMod implements ModInitializer {
 			PantheonNetworking.sendConfigTo(handler.player);
 			HotbarOwnership.broadcast(server);
 		});
-		ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
-			HotbarOwnership.onDisconnect(handler.player.getUUID());
-			HotbarOwnership.broadcast(server);
-		});
+		ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> HotbarOwnership.broadcast(server));
 
 		ServerTickEvents.END_SERVER_TICK.register(server -> {
 			this.tickCounter++;
