@@ -9,7 +9,8 @@ A [Fabric](https://fabricmc.net/) mod for Minecraft that gives every player on t
 - **Independent aim, shared gear** — each player keeps their own selected hotbar slot, so two players can hold two different (shared) items at once.
 - **Optional hotbar slot ownership** — when enabled, whichever hotbar slot a player currently has selected is exclusively "theirs" until they switch off it. Nobody else can take from, place into, or otherwise touch that slot — not by clicking it directly, shift-clicking something onto it, pressing a number key while hovering another slot, swapping hands, or dropping — and nobody else can select it themselves either: pressing its number key does nothing, and scrolling past it jumps straight over to the next free slot in that direction instead of landing on it or getting stuck. Enabling this caps the server at **9 players** (one per hotbar slot); the 10th+ connection is rejected with a clear reason.
 - **Colors match the locator bar** — each player's lock-frame color is computed from their UUID the exact same way vanilla's locator bar dots are, so the same player is always the same color in both places, server-wide, with no extra networking needed.
-- **`keepInventory` is forced on** — a shared inventory can't survive one player's death clearing it for everyone, so the mod sets the `keepInventory` game rule to `true` on server start.
+- **Optional shared health and/or hunger** — two independent toggles. With shared health on, every online player's health moves together (damage, healing, regen, everything) as one pool; if it hits 0, everyone dies at once. With shared hunger on, food level and saturation move together the same way. Either can be on without the other.
+- **`keepInventory` is forced on** — a shared inventory can't survive one player's death clearing it for everyone, so the mod sets the `keepInventory` game rule to `true` on server start. This also means a shared-health wipe doesn't drop anyone's items.
 - **Stateless by design** — the shared inventory lives in memory and resets every time the server starts, so it never conflicts with per-player save data.
 
 ## Settings
@@ -17,9 +18,9 @@ A [Fabric](https://fabricmc.net/) mod for Minecraft that gives every player on t
 Settings are server-authoritative (they affect every connected player identically) and can be changed two ways:
 
 - **In-game**: press the "Open Pantheon Settings" key (unbound by default — bind it in Controls) to open the settings screen. Anyone can open it to view the current settings, but only the singleplayer host or a server operator can actually save changes.
-- **Command**: `/pantheon config` shows current settings; `/pantheon config <setting> <value>` changes one (op-only). Settings: `syncArmor`, `syncOffhand`, `enableHotbarOwnership` (all booleans).
+- **Command**: `/pantheon config` shows current settings; `/pantheon config <setting> <value>` changes one (op-only). Settings: `syncArmor`, `syncOffhand`, `enableHotbarOwnership`, `syncHealth`, `syncHunger` (all booleans).
 
-Settings persist in `config/pantheon.json`. Changing `syncArmor`/`syncOffhand` takes effect for players as they (re)join; `enableHotbarOwnership` takes effect immediately.
+Settings persist in `config/pantheon.json`. Changing `syncArmor`/`syncOffhand` takes effect for players as they (re)join; the rest take effect immediately.
 
 ## Requirements
 
@@ -43,6 +44,8 @@ The mod needs to be installed on the server for multiplayer; clients need it too
 Every `ServerPlayer`'s `Inventory` is wired via a mixin (see `com.pantheon.mixin`) to point at the same backing item list instead of its own, so writes from one player are immediately visible to all. Armor/offhand sharing is gated by `PantheonConfig` and applied the same way, redirecting `PlayerEquipment`'s get/set per slot type.
 
 Hotbar-slot locking has two layers. In the inventory/container GUI, `HotbarLockMixin` cancels a click outright if it's directly on a locked slot (hovering it and pressing Q, F, a number key, or clicking it) — this has to happen *before* vanilla processes it, since dropping an item or swapping to the offhand has an external side effect (a dropped entity, a written offhand slot) that reverting the slot afterward can't undo without leaving a duplicate behind. As a backstop for indirect landings vanilla picks internally (e.g. shift-clicking a stack in from a chest), the 9 hotbar slots and the cursor are also snapshotted before the click and restored if a slot locked to someone else changed anyway. Outside a GUI, selecting a slot by scrolling skips over a locked one to the next free slot in the same direction, and pressing its number key does nothing (`com.pantheon.client.mixin.HotbarScrollLockMixin`/`HotbarNumberKeyLockMixin`), with a server-side reject (`HotbarSelectionCapMixin`) as a backstop against a client that skips the check.
+
+Health and hunger aren't a shared reference the way inventory slots are — each player's is their own synced value — so `SharedStats` instead polls once a server tick: whichever online player's value no longer matches what was last synced to everyone is treated as the source of a fresh change (damage, healing, eating, or a fresh join adopting the existing pool), and that value is applied to everyone else. A shared-health pool reaching 0 kills every online player through the normal death pipeline (`Entity#kill`), so the forced `keepInventory` rule still prevents any item drops even when everyone dies at once.
 
 ## License
 

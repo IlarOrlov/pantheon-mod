@@ -17,7 +17,9 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 public record SyncConfigPayload(
 	boolean syncArmor,
 	boolean syncOffhand,
-	boolean enableHotbarOwnership
+	boolean enableHotbarOwnership,
+	boolean syncHealth,
+	boolean syncHunger
 ) implements CustomPacketPayload {
 	public static final CustomPacketPayload.Type<SyncConfigPayload> TYPE = new CustomPacketPayload.Type<>(PantheonMod.id("sync_config"));
 
@@ -25,6 +27,8 @@ public record SyncConfigPayload(
 		ByteBufCodecs.BOOL, SyncConfigPayload::syncArmor,
 		ByteBufCodecs.BOOL, SyncConfigPayload::syncOffhand,
 		ByteBufCodecs.BOOL, SyncConfigPayload::enableHotbarOwnership,
+		ByteBufCodecs.BOOL, SyncConfigPayload::syncHealth,
+		ByteBufCodecs.BOOL, SyncConfigPayload::syncHunger,
 		SyncConfigPayload::new
 	);
 
@@ -32,7 +36,9 @@ public record SyncConfigPayload(
 		return new SyncConfigPayload(
 			config.syncArmor,
 			config.syncOffhand,
-			config.enableHotbarOwnership
+			config.enableHotbarOwnership,
+			config.syncHealth,
+			config.syncHunger
 		);
 	}
 
@@ -41,6 +47,8 @@ public record SyncConfigPayload(
 		config.syncArmor = this.syncArmor;
 		config.syncOffhand = this.syncOffhand;
 		config.enableHotbarOwnership = this.enableHotbarOwnership;
+		config.syncHealth = this.syncHealth;
+		config.syncHunger = this.syncHunger;
 		return config;
 	}
 

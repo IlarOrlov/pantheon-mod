@@ -34,6 +34,8 @@ public final class PantheonConfig {
 	public boolean syncArmor = true;
 	public boolean syncOffhand = true;
 	public boolean enableHotbarOwnership = false;
+	public boolean syncHealth = false;
+	public boolean syncHunger = false;
 
 	public static PantheonConfig get() {
 		return instance;
@@ -88,6 +90,8 @@ public final class PantheonConfig {
 		copy.syncArmor = this.syncArmor;
 		copy.syncOffhand = this.syncOffhand;
 		copy.enableHotbarOwnership = this.enableHotbarOwnership;
+		copy.syncHealth = this.syncHealth;
+		copy.syncHunger = this.syncHunger;
 		return copy;
 	}
 }

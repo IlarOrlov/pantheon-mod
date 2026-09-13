@@ -47,6 +47,7 @@ public class PantheonMod implements ModInitializer {
 		ServerTickEvents.END_SERVER_TICK.register(server -> {
 			this.tickCounter++;
 			HotbarOwnership.tick(server);
+			SharedStats.tick(server);
 			if (this.tickCounter % RESYNC_INTERVAL_TICKS == 0) {
 				HotbarOwnership.broadcast(server);
 			}
