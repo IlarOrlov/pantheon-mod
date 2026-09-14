@@ -121,8 +121,22 @@ public final class SharedStats {
 		}
 
 		for (ServerPlayer player : online) {
-			lastSyncedHealth.put(player.getUUID(), sharedHealth);
+			UUID uuid = player.getUUID();
 			float currentHealth = player.getHealth();
+
+			if (!lastSyncedHealth.containsKey(uuid) && currentHealth <= 0f) {
+				// Never tracked before, and reading as already-dead the very
+				// first time we see them - a fresh join's health can briefly
+				// read as an uninitialized 0 for a tick or two before
+				// Minecraft properly sets it, and that's indistinguishable
+				// from a real death by value alone. A brand new player is
+				// never legitimately already dead, so don't start tracking
+				// them (and don't let this poison the pool) until we've seen
+				// a real, positive reading from them.
+				continue;
+			}
+
+			lastSyncedHealth.put(uuid, sharedHealth);
 			if (currentHealth <= 0f) {
 				// Already dead and awaiting their own respawn click - forcing
 				// setHealth on them wouldn't actually respawn them, just leave
