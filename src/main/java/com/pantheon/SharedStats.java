@@ -74,8 +74,6 @@ public final class SharedStats {
 		}
 		lastSyncedHealth.keySet().retainAll(uuids(online));
 
-		Float before = sharedHealth;
-
 		if (sharedHealth != null && sharedHealth <= 0f) {
 			// Settled dead-pool state: everyone who was online got killed for it
 			// already, so don't force anyone down further. A respawning player
@@ -90,8 +88,6 @@ public final class SharedStats {
 			// by that definition, so it can't be used to detect this.)
 			for (ServerPlayer player : online) {
 				if (player.getHealth() > 0f) {
-					PantheonMod.LOGGER.info("[SharedStats] revival: {} health={} -> sharedHealth {} -> {}",
-						player.getGameProfile().name(), player.getHealth(), before, player.getHealth());
 					sharedHealth = player.getHealth();
 					sharedDeathHandled = false;
 					break;
@@ -108,10 +104,6 @@ public final class SharedStats {
 			}
 			if (sharedHealth == null) {
 				sharedHealth = online.get(0).getHealth();
-			}
-			if (sourceOfChange != null) {
-				PantheonMod.LOGGER.info("[SharedStats] detected change: {} previous={} current={} -> sharedHealth {} -> {}",
-					sourceOfChange.getGameProfile().name(), lastSyncedHealth.get(sourceOfChange.getUUID()), sourceOfChange.getHealth(), before, sharedHealth);
 			}
 
 			if (sharedHealth <= 0f && !sharedDeathHandled) {
@@ -153,8 +145,6 @@ public final class SharedStats {
 			}
 			lastSyncedHealth.put(uuid, sharedHealth);
 			if (sharedHealth <= 0f) {
-				PantheonMod.LOGGER.info("[SharedStats] killing {} (was {}) because sharedHealth={}",
-					player.getGameProfile().name(), currentHealth, sharedHealth);
 				player.setHealth(0f);
 				player.die(player.damageSources().generic());
 			} else if (currentHealth != sharedHealth) {
