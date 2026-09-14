@@ -36,6 +36,8 @@ public final class PantheonConfig {
 	public boolean enableHotbarOwnership = false;
 	public boolean syncHealth = false;
 	public boolean syncHunger = false;
+	/** When on, sharing is scoped per-team ({@code /pantheon team}) instead of one pool for the whole server. */
+	public boolean teamsEnabled = false;
 
 	public static PantheonConfig get() {
 		return instance;
@@ -92,6 +94,7 @@ public final class PantheonConfig {
 		copy.enableHotbarOwnership = this.enableHotbarOwnership;
 		copy.syncHealth = this.syncHealth;
 		copy.syncHunger = this.syncHunger;
+		copy.teamsEnabled = this.teamsEnabled;
 		return copy;
 	}
 }

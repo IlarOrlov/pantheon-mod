@@ -7,8 +7,8 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-import com.pantheon.SharedInventory;
 import com.pantheon.PantheonConfig;
+import com.pantheon.TeamManager;
 
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.EquipmentSlot;
@@ -17,11 +17,14 @@ import net.minecraft.world.entity.player.PlayerEquipment;
 import net.minecraft.world.item.ItemStack;
 
 /**
- * Redirects armor and offhand reads/writes to {@link SharedInventory#SHARED_EQUIPMENT}
- * whenever {@link PantheonConfig} says that slot type should be shared, so
- * armor/offhand toggle independently and can be flipped live without
- * reconnecting. Mainhand is untouched here - {@link PlayerEquipment} already
- * routes it through the (always-shared) {@link com.pantheon.mixin.InventorySharingMixin}.
+ * Redirects armor and offhand reads/writes to the player's resolved
+ * {@link com.pantheon.Team}'s equipment map whenever {@link PantheonConfig}
+ * says that slot type should be shared, so armor/offhand toggle independently
+ * and can be flipped live without reconnecting. Resolving the team fresh on
+ * every call (rather than caching it) also means switching teams takes effect
+ * immediately, with no extra bookkeeping needed here. Mainhand is untouched
+ * here - {@link PlayerEquipment} already routes it through the (always-shared)
+ * {@link InventorySharingMixin}.
  */
 @Mixin(PlayerEquipment.class)
 public abstract class EquipmentSharingMixin {
@@ -31,15 +34,15 @@ public abstract class EquipmentSharingMixin {
 
 	@Inject(method = "get", at = @At("HEAD"), cancellable = true)
 	private void pantheon$get(final EquipmentSlot slot, final CallbackInfoReturnable<ItemStack> cir) {
-		if (this.player instanceof ServerPlayer && PantheonConfig.get().isEquipmentSlotShared(slot)) {
-			cir.setReturnValue(SharedInventory.SHARED_EQUIPMENT.getOrDefault(slot, ItemStack.EMPTY));
+		if (this.player instanceof ServerPlayer serverPlayer && PantheonConfig.get().isEquipmentSlotShared(slot)) {
+			cir.setReturnValue(TeamManager.teamOf(serverPlayer).equipment.getOrDefault(slot, ItemStack.EMPTY));
 		}
 	}
 
 	@Inject(method = "set", at = @At("HEAD"), cancellable = true)
 	private void pantheon$set(final EquipmentSlot slot, final ItemStack stack, final CallbackInfoReturnable<ItemStack> cir) {
-		if (this.player instanceof ServerPlayer && PantheonConfig.get().isEquipmentSlotShared(slot)) {
-			ItemStack previous = SharedInventory.SHARED_EQUIPMENT.put(slot, stack == null ? ItemStack.EMPTY : stack);
+		if (this.player instanceof ServerPlayer serverPlayer && PantheonConfig.get().isEquipmentSlotShared(slot)) {
+			ItemStack previous = TeamManager.teamOf(serverPlayer).equipment.put(slot, stack == null ? ItemStack.EMPTY : stack);
 			cir.setReturnValue(previous == null ? ItemStack.EMPTY : previous);
 		}
 	}

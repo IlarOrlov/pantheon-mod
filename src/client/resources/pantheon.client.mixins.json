@@ -3,6 +3,7 @@
 	"package": "com.pantheon.client.mixin",
 	"compatibilityLevel": "JAVA_25",
 	"client": [
+		"ContainerScreenHoveredSlotAccessor",
 		"HotbarLockFrameMixin",
 		"HotbarScrollLockMixin",
 		"HotbarNumberKeyLockMixin"

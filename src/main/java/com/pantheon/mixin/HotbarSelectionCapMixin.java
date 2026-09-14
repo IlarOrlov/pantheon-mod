@@ -13,7 +13,6 @@ import com.pantheon.HotbarOwnership;
 import com.pantheon.network.HotbarOwnersPayload;
 
 import net.minecraft.network.protocol.game.ServerboundSetCarriedItemPacket;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
 
@@ -37,8 +36,7 @@ public abstract class HotbarSelectionCapMixin {
 			return;
 		}
 
-		ServerLevel level = (ServerLevel) this.player.level();
-		List<UUID> owners = HotbarOwnership.currentOwners(level.getServer());
+		List<UUID> owners = HotbarOwnership.currentOwnersFor(this.player);
 		UUID owner = owners.get(slot);
 		if (!owner.equals(HotbarOwnersPayload.NO_OWNER) && !owner.equals(this.player.getUUID())) {
 			ci.cancel();

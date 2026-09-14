@@ -20,7 +20,8 @@ public record UpdateConfigPayload(
 	boolean syncOffhand,
 	boolean enableHotbarOwnership,
 	boolean syncHealth,
-	boolean syncHunger
+	boolean syncHunger,
+	boolean teamsEnabled
 ) implements CustomPacketPayload {
 	public static final CustomPacketPayload.Type<UpdateConfigPayload> TYPE = new CustomPacketPayload.Type<>(PantheonMod.id("update_config"));
 
@@ -30,6 +31,7 @@ public record UpdateConfigPayload(
 		ByteBufCodecs.BOOL, UpdateConfigPayload::enableHotbarOwnership,
 		ByteBufCodecs.BOOL, UpdateConfigPayload::syncHealth,
 		ByteBufCodecs.BOOL, UpdateConfigPayload::syncHunger,
+		ByteBufCodecs.BOOL, UpdateConfigPayload::teamsEnabled,
 		UpdateConfigPayload::new
 	);
 
@@ -39,7 +41,8 @@ public record UpdateConfigPayload(
 			config.syncOffhand,
 			config.enableHotbarOwnership,
 			config.syncHealth,
-			config.syncHunger
+			config.syncHunger,
+			config.teamsEnabled
 		);
 	}
 
@@ -50,6 +53,7 @@ public record UpdateConfigPayload(
 		config.enableHotbarOwnership = this.enableHotbarOwnership;
 		config.syncHealth = this.syncHealth;
 		config.syncHunger = this.syncHunger;
+		config.teamsEnabled = this.teamsEnabled;
 		return config;
 	}
 
