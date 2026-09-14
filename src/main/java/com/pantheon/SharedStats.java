@@ -136,14 +136,22 @@ public final class SharedStats {
 				continue;
 			}
 
-			lastSyncedHealth.put(uuid, sharedHealth);
 			if (currentHealth <= 0f) {
 				// Already dead and awaiting their own respawn click - forcing
 				// setHealth on them wouldn't actually respawn them, just leave
 				// health and death-screen state inconsistent. Leave them alone;
 				// they'll fall into the branch above once they do respawn.
+				//
+				// Track their REAL (still-dead) value here, not sharedHealth -
+				// if someone else revived in the meantime, sharedHealth is now
+				// a healthy number that doesn't apply to this player yet, and
+				// recording it as if it did would make the next tick see their
+				// real (still 0) health as a mismatch - "they just died again" -
+				// when nothing actually happened to them.
+				lastSyncedHealth.put(uuid, currentHealth);
 				continue;
 			}
+			lastSyncedHealth.put(uuid, sharedHealth);
 			if (sharedHealth <= 0f) {
 				PantheonMod.LOGGER.info("[SharedStats] killing {} (was {}) because sharedHealth={}",
 					player.getGameProfile().name(), currentHealth, sharedHealth);
