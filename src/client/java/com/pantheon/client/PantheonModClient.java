@@ -7,6 +7,7 @@ import java.util.UUID;
 import com.pantheon.PantheonConfig;
 import com.pantheon.PantheonMod;
 import com.pantheon.client.mixin.ContainerScreenHoveredSlotAccessor;
+import com.pantheon.client.mixin.KeyMappingKeyAccessor;
 import com.pantheon.network.HotbarOwnersPayload;
 import com.pantheon.network.RequestSlotPayload;
 import com.pantheon.network.SyncConfigPayload;
@@ -33,6 +34,7 @@ public class PantheonModClient implements ClientModInitializer {
 
 	private static KeyMapping openSettingsKey;
 	private static KeyMapping requestSlotKey;
+	private static boolean requestSlotKeyWasPhysicallyDown;
 
 	@Override
 	public void onInitializeClient() {
@@ -67,7 +69,26 @@ public class PantheonModClient implements ClientModInitializer {
 			while (requestSlotKey.consumeClick()) {
 				requestHoveredSlot(client);
 			}
+			// Backstop for consumeClick(): some inventory screens can eat the raw
+			// key event before it reaches KeyMapping's own click-tracking, which
+			// would otherwise make the ping key silently do nothing while a
+			// container screen has focus - exactly the situation it's meant for.
+			// Poll the physical key state directly instead, with our own
+			// rising-edge detection so a held key doesn't fire every tick.
+			boolean physicallyDown = isRequestSlotKeyPhysicallyDown(client);
+			if (physicallyDown && !requestSlotKeyWasPhysicallyDown) {
+				requestHoveredSlot(client);
+			}
+			requestSlotKeyWasPhysicallyDown = physicallyDown;
 		});
+	}
+
+	private static boolean isRequestSlotKeyPhysicallyDown(final Minecraft client) {
+		InputConstants.Key key = ((KeyMappingKeyAccessor) requestSlotKey).pantheon$getKey();
+		if (key.getType() != InputConstants.Type.KEYSYM || key.equals(InputConstants.UNKNOWN)) {
+			return false;
+		}
+		return InputConstants.isKeyDown(client.getWindow(), key.getValue());
 	}
 
 	/**
@@ -133,15 +154,29 @@ public class PantheonModClient implements ClientModInitializer {
 	 * that outline. Since we already know locally which slot we've selected,
 	 * predict our own frame immediately and only defer to the broadcast for
 	 * everyone else's slots.
+	 *
+	 * <p>The broadcast list can also still say <em>we</em> own a slot we've
+	 * already scrolled away from, for that same one-round-trip window - left
+	 * alone, that shows our frame on both the old and new slot at once, and
+	 * scrolling quickly through several slots in a row turns that into a
+	 * visible trail of stale frames. Since we know with certainty (no
+	 * network latency involved) which slot is and isn't ours right now,
+	 * treat any *other* slot the broadcast still credits to us as unowned
+	 * instead of trusting that stale entry.
 	 */
 	public static UUID effectiveOwner(final int slot) {
 		Minecraft minecraft = Minecraft.getInstance();
-		if (minecraft.player != null
-			&& lastKnownConfig.enableHotbarOwnership
-			&& slot == minecraft.player.getInventory().getSelectedSlot()) {
-			return minecraft.player.getUUID();
+		UUID broadcastOwner = (slot >= 0 && slot < hotbarOwners.size()) ? hotbarOwners.get(slot) : HotbarOwnersPayload.NO_OWNER;
+
+		if (minecraft.player == null || !lastKnownConfig.enableHotbarOwnership) {
+			return broadcastOwner;
 		}
-		return (slot >= 0 && slot < hotbarOwners.size()) ? hotbarOwners.get(slot) : HotbarOwnersPayload.NO_OWNER;
+
+		UUID self = minecraft.player.getUUID();
+		if (slot == minecraft.player.getInventory().getSelectedSlot()) {
+			return self;
+		}
+		return broadcastOwner.equals(self) ? HotbarOwnersPayload.NO_OWNER : broadcastOwner;
 	}
 
 	private static List<UUID> emptyOwners() {

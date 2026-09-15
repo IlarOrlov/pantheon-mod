@@ -26,8 +26,10 @@ import net.minecraft.server.level.ServerPlayer;
  * returns the one {@value #GLOBAL_TEAM_NAME} team regardless of any team
  * assignment on record - the original one-pool-for-the-whole-server
  * behavior. When it's on, a player resolves to whichever team they were
- * last assigned to via {@code /pantheon team}, or {@value #DEFAULT_TEAM_NAME}
- * if they were never assigned one.
+ * last assigned to via {@code /pantheon team}, or back to
+ * {@value #GLOBAL_TEAM_NAME} if they were never assigned one - there's no
+ * separate "default" team to keep track of; an unassigned player just stays
+ * in the global pool until someone puts them on a real team.
  *
  * <p>Which teams exist and who's assigned to them persists in
  * {@code config/pantheon-teams.json} (loaded fresh on every server start via
@@ -38,7 +40,6 @@ import net.minecraft.server.level.ServerPlayer;
  */
 public final class TeamManager {
 	public static final String GLOBAL_TEAM_NAME = "global";
-	public static final String DEFAULT_TEAM_NAME = "default";
 
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
@@ -128,7 +129,10 @@ public final class TeamManager {
 		if (!PantheonConfig.get().teamsEnabled) {
 			return teams.get(GLOBAL_TEAM_NAME);
 		}
-		String name = assignments.getOrDefault(player, DEFAULT_TEAM_NAME);
+		String name = assignments.get(player);
+		if (name == null) {
+			return teams.get(GLOBAL_TEAM_NAME);
+		}
 		return teams.computeIfAbsent(name, Team::new);
 	}
 
@@ -138,7 +142,7 @@ public final class TeamManager {
 
 	/** The team name a player would show up under in {@code /pantheon team list}, regardless of teamsEnabled. */
 	public static String assignedTeamName(final UUID player) {
-		return assignments.getOrDefault(player, DEFAULT_TEAM_NAME);
+		return assignments.getOrDefault(player, GLOBAL_TEAM_NAME);
 	}
 
 	public static boolean exists(final String name) {
@@ -155,7 +159,7 @@ public final class TeamManager {
 		return true;
 	}
 
-	/** Deletes a team (never the global one) and un-assigns anyone on it, who then fall back to the default team. */
+	/** Deletes a team (never the global one) and un-assigns anyone on it, who then fall back to the global pool. */
 	public static boolean delete(final String name) {
 		if (GLOBAL_TEAM_NAME.equals(name) || !teams.containsKey(name)) {
 			return false;

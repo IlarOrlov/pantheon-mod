@@ -187,7 +187,7 @@ public final class PantheonCommands {
 		}
 		TeamManager.reassignAllOnline(source.getServer());
 		HotbarOwnership.broadcast(source.getServer());
-		source.sendSuccess(() -> Component.literal("Deleted team '" + name + "'. Its members fall back to the default team."), true);
+		source.sendSuccess(() -> Component.literal("Deleted team '" + name + "'. Its members fall back to the global pool."), true);
 		return 1;
 	}
 
@@ -210,7 +210,7 @@ public final class PantheonCommands {
 		TeamManager.unassign(player.getUUID());
 		TeamManager.reassignInventory(player);
 		HotbarOwnership.broadcast(context.getSource().getServer());
-		context.getSource().sendSuccess(() -> Component.literal(player.getGameProfile().name() + " left their team and is now on the default team."), true);
+		context.getSource().sendSuccess(() -> Component.literal(player.getGameProfile().name() + " left their team and is now on the global pool."), true);
 		return 1;
 	}
 

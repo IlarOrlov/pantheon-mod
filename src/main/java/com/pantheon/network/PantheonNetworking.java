@@ -67,7 +67,10 @@ public final class PantheonNetworking {
 		team.lastPingTick.put(requester.getUUID(), now);
 
 		ServerPlayer owner = server.getPlayerList().getPlayer(ownerId);
-		if (owner == null) {
+		// currentOwnersFor already only returns owners among the requester's own
+		// teammates, but re-checking here too means this can never regress into
+		// cross-team pinging even if that computation is ever refactored.
+		if (owner == null || TeamManager.teamOf(owner) != team) {
 			return;
 		}
 

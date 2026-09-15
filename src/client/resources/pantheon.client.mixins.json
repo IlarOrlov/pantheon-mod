@@ -6,7 +6,8 @@
 		"ContainerScreenHoveredSlotAccessor",
 		"HotbarLockFrameMixin",
 		"HotbarScrollLockMixin",
-		"HotbarNumberKeyLockMixin"
+		"HotbarNumberKeyLockMixin",
+		"KeyMappingKeyAccessor"
 	],
 	"injectors": {
 		"defaultRequire": 1

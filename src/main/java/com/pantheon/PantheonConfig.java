@@ -33,7 +33,7 @@ public final class PantheonConfig {
 
 	public boolean syncArmor = false;
 	public boolean syncOffhand = false;
-	public boolean enableHotbarOwnership = false;
+	public boolean enableHotbarOwnership = true;
 	public boolean syncHealth = false;
 	public boolean syncHunger = false;
 	public boolean syncExperience = false;
