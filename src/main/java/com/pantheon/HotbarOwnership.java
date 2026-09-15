@@ -80,13 +80,24 @@ public final class HotbarOwnership {
 	 * instead of resolving it.
 	 *
 	 * <p>Selecting a hotbar slot is normally entirely client-driven - the
-	 * server only ever trusts whatever the client last reported, so forcing
-	 * a move here server-side would otherwise leave {@code player}'s own
-	 * client still believing (and rendering its lock frame on) the old slot,
-	 * while everyone else's broadcast correctly shows the new one - a
-	 * same-slot-shows-two-frames desync visible only to {@code player}
-	 * themselves. {@link ForceHotbarSlotPayload} tells their client to update
-	 * to match.
+	 * server only ever trusts whatever the client last reported. On respawn
+	 * specifically, the server correctly carries the player's selected slot
+	 * over from before they died ({@code Inventory#replaceWith} inside
+	 * {@code ServerPlayer#restoreFrom}) - but that's a server-side copy
+	 * between two entity instances that the client has no part in, so the
+	 * client's <em>own</em> freshly-respawned local view of its selected slot
+	 * resets to 0 independently, with no idea the server just restored a
+	 * different value. Left alone, the client then reports that stale 0 back
+	 * as an entirely ordinary selection-change packet: unremarkable if 0
+	 * happens to be free, but if it's already someone else's, our own lock
+	 * silently rejects the packet server-side while the client is never told
+	 * - so it keeps believing (and rendering its own lock frame on) the slot
+	 * 0 it already thinks is its, stacked right on top of the real owner's
+	 * frame everyone else's broadcast correctly shows there. Always telling
+	 * the client its actual resolved slot here, via {@link ForceHotbarSlotPayload},
+	 * regardless of whether a conflict needed resolving, closes that gap at
+	 * the source instead of only patching the cases where we ourselves moved
+	 * the player.
 	 */
 	public static void resolveSlotConflict(final MinecraftServer server, final ServerPlayer player) {
 		if (!PantheonConfig.get().enableHotbarOwnership) {
@@ -115,23 +126,24 @@ public final class HotbarOwnership {
 				contested = true;
 			}
 		}
-		if (!contested) {
+
+		int finalSlot = mySlot;
+		if (contested) {
+			for (int i = 0; i < HotbarOwnersPayload.SLOT_COUNT; i++) {
+				if (!takenByOthers[i]) {
+					finalSlot = i;
+					player.getInventory().setSelectedSlot(i);
+					break;
+				}
+			}
+			PantheonMod.LOGGER.info("[HotbarOwnership] resolveSlotConflict: {} moved from contested slot {} to {} in team '{}'",
+				player.getGameProfile().name(), mySlot, finalSlot, team.name);
+		} else {
 			PantheonMod.LOGGER.info("[HotbarOwnership] resolveSlotConflict: {} on slot {} in team '{}' - no conflict",
 				player.getGameProfile().name(), mySlot, team.name);
-			return;
 		}
 
-		for (int i = 0; i < HotbarOwnersPayload.SLOT_COUNT; i++) {
-			if (!takenByOthers[i]) {
-				player.getInventory().setSelectedSlot(i);
-				ServerPlayNetworking.send(player, new ForceHotbarSlotPayload(i));
-				PantheonMod.LOGGER.info("[HotbarOwnership] resolveSlotConflict: {} moved from contested slot {} to {} in team '{}'",
-					player.getGameProfile().name(), mySlot, i, team.name);
-				return;
-			}
-		}
-		PantheonMod.LOGGER.info("[HotbarOwnership] resolveSlotConflict: {} contested on slot {} in team '{}' but no free slot found",
-			player.getGameProfile().name(), mySlot, team.name);
+		ServerPlayNetworking.send(player, new ForceHotbarSlotPayload(finalSlot));
 	}
 
 	/** Recomputes ownership per online team and, only for teams where it changed since the last check, pushes it to that team's clients. */
