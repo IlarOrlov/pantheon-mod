@@ -37,6 +37,12 @@ public final class Team {
 	final Map<UUID, Integer> lastSyncedFood = new HashMap<>();
 	final Map<UUID, Float> lastSyncedSaturation = new HashMap<>();
 
+	// SharedStats experience tracking.
+	Integer sharedExperienceLevel;
+	Float sharedExperienceProgress;
+	final Map<UUID, Integer> lastSyncedExperienceLevel = new HashMap<>();
+	final Map<UUID, Float> lastSyncedExperienceProgress = new HashMap<>();
+
 	// "Request the slot" ping cooldowns, keyed by requesting player.
 	public final Map<UUID, Long> lastPingTick = new HashMap<>();
 

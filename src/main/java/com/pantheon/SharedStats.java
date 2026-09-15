@@ -64,6 +64,15 @@ public final class SharedStats {
 				team.lastSyncedFood.clear();
 				team.lastSyncedSaturation.clear();
 			}
+
+			if (config.syncExperience) {
+				tickExperience(team, online);
+			} else if (team.sharedExperienceLevel != null) {
+				team.sharedExperienceLevel = null;
+				team.sharedExperienceProgress = null;
+				team.lastSyncedExperienceLevel.clear();
+				team.lastSyncedExperienceProgress.clear();
+			}
 		}
 	}
 
@@ -212,6 +221,48 @@ public final class SharedStats {
 			}
 			if (player.getFoodData().getSaturationLevel() != team.sharedSaturation) {
 				player.getFoodData().setSaturation(team.sharedSaturation);
+			}
+		}
+	}
+
+	/**
+	 * Mirrors {@link #tickHunger} but for experience level + progress-within-level.
+	 * {@code experienceLevel}/{@code experienceProgress} are copied directly
+	 * (same approach as food level/saturation) rather than converting through
+	 * a combined "total XP" number, so a level-up from one teammate's own kill
+	 * or mining shows up for the rest of the team exactly as it happened.
+	 */
+	private static void tickExperience(final Team team, final List<ServerPlayer> online) {
+		if (online.isEmpty()) {
+			return;
+		}
+		team.lastSyncedExperienceLevel.keySet().retainAll(uuids(online));
+		team.lastSyncedExperienceProgress.keySet().retainAll(uuids(online));
+
+		for (ServerPlayer player : online) {
+			Integer previousLevel = team.lastSyncedExperienceLevel.get(player.getUUID());
+			Float previousProgress = team.lastSyncedExperienceProgress.get(player.getUUID());
+			int level = player.experienceLevel;
+			float progress = player.experienceProgress;
+			if ((previousLevel != null && previousLevel.intValue() != level)
+				|| (previousProgress != null && previousProgress.floatValue() != progress)) {
+				team.sharedExperienceLevel = level;
+				team.sharedExperienceProgress = progress;
+			}
+		}
+		if (team.sharedExperienceLevel == null) {
+			team.sharedExperienceLevel = online.get(0).experienceLevel;
+			team.sharedExperienceProgress = online.get(0).experienceProgress;
+		}
+
+		for (ServerPlayer player : online) {
+			team.lastSyncedExperienceLevel.put(player.getUUID(), team.sharedExperienceLevel);
+			team.lastSyncedExperienceProgress.put(player.getUUID(), team.sharedExperienceProgress);
+			if (player.experienceLevel != team.sharedExperienceLevel) {
+				player.setExperienceLevels(team.sharedExperienceLevel);
+			}
+			if (player.experienceProgress != team.sharedExperienceProgress) {
+				player.setExperiencePoints(Math.round(team.sharedExperienceProgress * player.getXpNeededForNextLevel()));
 			}
 		}
 	}

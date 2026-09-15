@@ -24,6 +24,7 @@ import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.inventory.Slot;
 
 public class PantheonModClient implements ClientModInitializer {
@@ -73,19 +74,29 @@ public class PantheonModClient implements ClientModInitializer {
 	 * If the local player is currently hovering a hotbar slot (in their own
 	 * inventory row of whatever container screen is open) that's locked to
 	 * another online player, asks the server to nudge that player about it.
+	 * Otherwise explains locally why there was nothing to ping, rather than
+	 * silently doing nothing - "occupied by an item" and "locked to someone
+	 * else" are easy to conflate, and only the latter is pingable.
 	 */
 	private static void requestHoveredSlot(final Minecraft client) {
-		if (!(client.gui.screen() instanceof AbstractContainerScreen<?> containerScreen) || client.player == null) {
+		if (client.player == null) {
+			return;
+		}
+		if (!lastKnownConfig.enableHotbarOwnership) {
+			client.player.sendOverlayMessage(Component.literal("Hotbar slot ownership is off - there's nothing to request."));
+			return;
+		}
+		if (!(client.gui.screen() instanceof AbstractContainerScreen<?> containerScreen)) {
+			client.player.sendOverlayMessage(Component.literal("Hover a locked hotbar slot in an inventory screen first."));
 			return;
 		}
 		Slot hovered = ((ContainerScreenHoveredSlotAccessor) containerScreen).pantheon$getHoveredSlot();
-		if (hovered == null || hovered.container != client.player.getInventory()) {
+		int index = hovered == null || hovered.container != client.player.getInventory() ? -1 : hovered.getContainerSlot();
+		if (index < 0 || !isLockedToSomeoneElse(index)) {
+			client.player.sendOverlayMessage(Component.literal("That hotbar slot isn't locked to anyone else."));
 			return;
 		}
-		int index = hovered.getContainerSlot();
-		if (isLockedToSomeoneElse(index)) {
-			ClientPlayNetworking.send(new RequestSlotPayload(index));
-		}
+		ClientPlayNetworking.send(new RequestSlotPayload(index));
 	}
 
 	public static List<UUID> getHotbarOwners() {

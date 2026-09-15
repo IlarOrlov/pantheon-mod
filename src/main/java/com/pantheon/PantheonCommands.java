@@ -9,6 +9,7 @@ import com.pantheon.network.SyncConfigPayload;
 
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.EntityArgument;
@@ -26,7 +27,7 @@ public final class PantheonCommands {
 	}
 
 	private static final SuggestionProvider<CommandSourceStack> SETTING_NAMES = (context, builder) -> {
-		for (String name : new String[] {"syncArmor", "syncOffhand", "enableHotbarOwnership", "syncHealth", "syncHunger", "teamsEnabled"}) {
+		for (String name : new String[] {"syncArmor", "syncOffhand", "enableHotbarOwnership", "syncHealth", "syncHunger", "syncExperience", "teamsEnabled"}) {
 			builder.suggest(name);
 		}
 		return builder.buildFuture();
@@ -90,6 +91,7 @@ public final class PantheonCommands {
 				+ ", enableHotbarOwnership=" + config.enableHotbarOwnership
 				+ ", syncHealth=" + config.syncHealth
 				+ ", syncHunger=" + config.syncHunger
+				+ ", syncExperience=" + config.syncExperience
 				+ ", teamsEnabled=" + config.teamsEnabled
 		), false);
 		return 1;
@@ -108,6 +110,7 @@ public final class PantheonCommands {
 				case "enableHotbarOwnership" -> config.enableHotbarOwnership = Boolean.parseBoolean(value);
 				case "syncHealth" -> config.syncHealth = Boolean.parseBoolean(value);
 				case "syncHunger" -> config.syncHunger = Boolean.parseBoolean(value);
+				case "syncExperience" -> config.syncExperience = Boolean.parseBoolean(value);
 				case "teamsEnabled" -> config.teamsEnabled = Boolean.parseBoolean(value);
 				default -> {
 					source.sendFailure(Component.literal("Unknown setting: " + setting));
@@ -136,8 +139,19 @@ public final class PantheonCommands {
 		return 1;
 	}
 
+	/** Team commands still work while {@code teamsEnabled} is off (so they can be set up in advance), but nothing they do actually affects sharing until it's on - make that obvious instead of a silent no-op. */
+	private static void warnIfTeamsDisabled(final CommandSourceStack source) {
+		if (!PantheonConfig.get().teamsEnabled) {
+			source.sendSystemMessage(Component.literal(
+				"Warning: teams are OFF (teamsEnabled=false) - sharing is still one server-wide pool. "
+					+ "Turn it on with /pantheon config teamsEnabled true."
+			).withStyle(ChatFormatting.YELLOW));
+		}
+	}
+
 	private static int listTeams(final com.mojang.brigadier.context.CommandContext<CommandSourceStack> context) {
 		CommandSourceStack source = context.getSource();
+		warnIfTeamsDisabled(source);
 		MinecraftServer server = source.getServer();
 		StringBuilder builder = new StringBuilder();
 		for (Team team : TeamManager.allTeams()) {
@@ -154,6 +168,7 @@ public final class PantheonCommands {
 	private static int createTeam(final com.mojang.brigadier.context.CommandContext<CommandSourceStack> context) {
 		String name = StringArgumentType.getString(context, "name");
 		CommandSourceStack source = context.getSource();
+		warnIfTeamsDisabled(source);
 		if (!TeamManager.create(name)) {
 			source.sendFailure(Component.literal("A team named '" + name + "' already exists."));
 			return 0;
@@ -165,6 +180,7 @@ public final class PantheonCommands {
 	private static int deleteTeam(final com.mojang.brigadier.context.CommandContext<CommandSourceStack> context) {
 		String name = StringArgumentType.getString(context, "name");
 		CommandSourceStack source = context.getSource();
+		warnIfTeamsDisabled(source);
 		if (!TeamManager.delete(name)) {
 			source.sendFailure(Component.literal("Can't delete '" + name + "' (it doesn't exist, or it's the global team)."));
 			return 0;
@@ -190,6 +206,7 @@ public final class PantheonCommands {
 			context.getSource().sendFailure(Component.literal("Only a player can leave a team."));
 			return 0;
 		}
+		warnIfTeamsDisabled(context.getSource());
 		TeamManager.unassign(player.getUUID());
 		TeamManager.reassignInventory(player);
 		HotbarOwnership.broadcast(context.getSource().getServer());
@@ -206,6 +223,7 @@ public final class PantheonCommands {
 		String name = StringArgumentType.getString(context, "name");
 		CommandSourceStack source = context.getSource();
 		MinecraftServer server = source.getServer();
+		warnIfTeamsDisabled(source);
 
 		if (!TeamManager.exists(name) && !TeamManager.create(name)) {
 			source.sendFailure(Component.literal("Couldn't find or create team '" + name + "'."));

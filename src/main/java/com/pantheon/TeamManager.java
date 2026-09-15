@@ -1,11 +1,21 @@
 package com.pantheon;
 
+import java.io.IOException;
+import java.io.Reader;
+import java.io.Writer;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+
+import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 
@@ -18,13 +28,23 @@ import net.minecraft.server.level.ServerPlayer;
  * behavior. When it's on, a player resolves to whichever team they were
  * last assigned to via {@code /pantheon team}, or {@value #DEFAULT_TEAM_NAME}
  * if they were never assigned one.
+ *
+ * <p>Which teams exist and who's assigned to them persists in
+ * {@code config/pantheon-teams.json} (loaded fresh on every server start via
+ * {@link #load()}), same as {@link PantheonConfig}'s settings - but each
+ * {@link Team}'s actual contents (items, equipment, hotbar/health/hunger/xp
+ * tracking) are session-only and always start empty, same as the old single
+ * pool always did.
  */
 public final class TeamManager {
 	public static final String GLOBAL_TEAM_NAME = "global";
 	public static final String DEFAULT_TEAM_NAME = "default";
 
+	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+
 	private static final Map<String, Team> teams = new LinkedHashMap<>();
 	private static final Map<UUID, String> assignments = new LinkedHashMap<>();
+	private static Path configPath;
 
 	static {
 		teams.put(GLOBAL_TEAM_NAME, new Team(GLOBAL_TEAM_NAME));
@@ -33,10 +53,75 @@ public final class TeamManager {
 	private TeamManager() {
 	}
 
-	public static void resetAll() {
+	/**
+	 * Rebuilds every team from scratch (so session-only state starts fresh)
+	 * and re-reads which teams exist and who's on them from disk. Called on
+	 * every server start (dedicated boot, or re-entering a singleplayer
+	 * world), same event that already resets the shared inventory.
+	 */
+	public static synchronized void load() {
 		teams.clear();
 		assignments.clear();
 		teams.put(GLOBAL_TEAM_NAME, new Team(GLOBAL_TEAM_NAME));
+
+		configPath = FabricLoader.getInstance().getConfigDir().resolve("pantheon-teams.json");
+		if (Files.exists(configPath)) {
+			try (Reader reader = Files.newBufferedReader(configPath, StandardCharsets.UTF_8)) {
+				Persisted persisted = GSON.fromJson(reader, Persisted.class);
+				if (persisted != null) {
+					if (persisted.teamNames != null) {
+						for (String name : persisted.teamNames) {
+							teams.computeIfAbsent(name, Team::new);
+						}
+					}
+					if (persisted.assignments != null) {
+						for (Map.Entry<String, String> entry : persisted.assignments.entrySet()) {
+							try {
+								UUID uuid = UUID.fromString(entry.getKey());
+								assignments.put(uuid, entry.getValue());
+								teams.computeIfAbsent(entry.getValue(), Team::new);
+							} catch (IllegalArgumentException ignored) {
+								// Corrupt/foreign UUID string - drop just this entry rather than fail the whole load.
+							}
+						}
+					}
+				}
+			} catch (IOException | RuntimeException e) {
+				PantheonMod.LOGGER.warn("Failed to read config/pantheon-teams.json, starting with no custom teams", e);
+			}
+		}
+	}
+
+	public static synchronized void save() {
+		if (configPath == null) {
+			configPath = FabricLoader.getInstance().getConfigDir().resolve("pantheon-teams.json");
+		}
+
+		Persisted persisted = new Persisted();
+		persisted.teamNames = new ArrayList<>();
+		for (String name : teams.keySet()) {
+			if (!GLOBAL_TEAM_NAME.equals(name)) {
+				persisted.teamNames.add(name);
+			}
+		}
+		persisted.assignments = new LinkedHashMap<>();
+		for (Map.Entry<UUID, String> entry : assignments.entrySet()) {
+			persisted.assignments.put(entry.getKey().toString(), entry.getValue());
+		}
+
+		try {
+			Files.createDirectories(configPath.getParent());
+			try (Writer writer = Files.newBufferedWriter(configPath, StandardCharsets.UTF_8)) {
+				GSON.toJson(persisted, writer);
+			}
+		} catch (IOException e) {
+			PantheonMod.LOGGER.warn("Failed to write config/pantheon-teams.json", e);
+		}
+	}
+
+	private static final class Persisted {
+		List<String> teamNames;
+		Map<String, String> assignments;
 	}
 
 	public static Team teamOf(final UUID player) {
@@ -66,6 +151,7 @@ public final class TeamManager {
 			return false;
 		}
 		teams.put(name, new Team(name));
+		save();
 		return true;
 	}
 
@@ -76,15 +162,18 @@ public final class TeamManager {
 		}
 		teams.remove(name);
 		assignments.values().removeIf(name::equals);
+		save();
 		return true;
 	}
 
 	public static void assign(final UUID player, final String teamName) {
 		assignments.put(player, teamName);
+		save();
 	}
 
 	public static void unassign(final UUID player) {
 		assignments.remove(player);
+		save();
 	}
 
 	public static List<Team> allTeams() {
@@ -113,10 +202,10 @@ public final class TeamManager {
 	/**
 	 * Re-points an online player's shared inventory at whatever team they
 	 * currently resolve to, and force-syncs their menu so they see it right
-	 * away. Equipment and hotbar-ownership/health/hunger tracking don't need
-	 * this - they're resolved live, per call/tick - but the shared item list
-	 * is a backing reference swapped once, so switching teams has to redo
-	 * that swap explicitly.
+	 * away. Equipment and hotbar-ownership/health/hunger/xp tracking don't
+	 * need this - they're resolved live, per call/tick - but the shared item
+	 * list is a backing reference swapped once, so switching teams has to
+	 * redo that swap explicitly.
 	 */
 	public static void reassignInventory(final ServerPlayer player) {
 		Team team = teamOf(player);
