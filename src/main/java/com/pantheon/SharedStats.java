@@ -21,7 +21,13 @@ import net.minecraft.world.item.ItemStack;
  * once a server tick, per team: whichever online teammate's value no longer
  * matches what was last synced to them is treated as the source of a fresh
  * change (damage, healing, eating, a fresh join adopting the existing pool,
- * ...), and that new value is then applied to the rest of the team.
+ * ...), and that new value is then applied to the rest of the team. The one
+ * deliberate exception is a single player individually respawning while the
+ * pool never actually hit 0 as a whole - vanilla always hands out full health
+ * on respawn regardless of what the pool currently is, so treating that as a
+ * fresh change would heal every other, already-damaged teammate back up
+ * just because this one player finally respawned. That player adopts the
+ * pool's current ("worst") value instead of resetting it to their own.
  *
  * <p>When {@link PantheonConfig#syncHealth} is on, a team's shared health pool
  * reaching 0 kills every online teammate at once, through the real death
@@ -110,8 +116,24 @@ public final class SharedStats {
 		} else {
 			for (ServerPlayer player : online) {
 				Float previous = team.lastSyncedHealth.get(player.getUUID());
-				if (previous != null && previous.floatValue() != player.getHealth()) {
-					team.sharedHealth = player.getHealth();
+				if (previous == null) {
+					continue;
+				}
+				float currentHealthNow = player.getHealth();
+				if (previous.floatValue() <= 0f && currentHealthNow > 0f) {
+					// This one player individually respawning, while the
+					// team's pool never actually hit 0 as a whole (everyone
+					// else stayed alive and may have taken damage since) -
+					// a fresh respawn always hands out full health regardless
+					// of what the shared pool currently is, so treating that
+					// as "the new pool value" would heal every other, already
+					// -damaged teammate back up just because this one player
+					// finally got around to respawning. They should adopt
+					// the pool instead (handled below), not drive it.
+					continue;
+				}
+				if (previous.floatValue() != currentHealthNow) {
+					team.sharedHealth = currentHealthNow;
 					sourceOfChange = player;
 				}
 			}
@@ -164,7 +186,7 @@ public final class SharedStats {
 				player.die(player.damageSources().generic());
 				if (!isRealCause && sourceOfChange != null) {
 					broadcastToTeam(online, FunnyMessages.randomPropagatedDeath(
-						player.getGameProfile().name(), sourceOfChange.getGameProfile().name()));
+						player.getGameProfile().name(), sourceOfChange.getGameProfile().name(), PantheonConfig.get().crudeHumor));
 				}
 			} else if (currentHealth != team.sharedHealth) {
 				player.setHealth(Math.min(team.sharedHealth, player.getMaxHealth()));

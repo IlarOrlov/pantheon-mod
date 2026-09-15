@@ -27,7 +27,7 @@ public final class PantheonCommands {
 	}
 
 	private static final SuggestionProvider<CommandSourceStack> SETTING_NAMES = (context, builder) -> {
-		for (String name : new String[] {"syncArmor", "syncOffhand", "enableHotbarOwnership", "syncHealth", "syncHunger", "syncExperience", "teamsEnabled"}) {
+		for (String name : new String[] {"syncArmor", "syncOffhand", "enableHotbarOwnership", "syncHealth", "syncHunger", "syncExperience", "teamsEnabled", "crudeHumor"}) {
 			builder.suggest(name);
 		}
 		return builder.buildFuture();
@@ -93,6 +93,7 @@ public final class PantheonCommands {
 				+ ", syncHunger=" + config.syncHunger
 				+ ", syncExperience=" + config.syncExperience
 				+ ", teamsEnabled=" + config.teamsEnabled
+				+ ", crudeHumor=" + config.crudeHumor
 		), false);
 		return 1;
 	}
@@ -112,6 +113,7 @@ public final class PantheonCommands {
 				case "syncHunger" -> config.syncHunger = Boolean.parseBoolean(value);
 				case "syncExperience" -> config.syncExperience = Boolean.parseBoolean(value);
 				case "teamsEnabled" -> config.teamsEnabled = Boolean.parseBoolean(value);
+				case "crudeHumor" -> config.crudeHumor = Boolean.parseBoolean(value);
 				default -> {
 					source.sendFailure(Component.literal("Unknown setting: " + setting));
 					return 0;

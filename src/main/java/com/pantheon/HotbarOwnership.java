@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import com.pantheon.network.ForceHotbarSlotPayload;
 import com.pantheon.network.HotbarOwnersPayload;
 
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
@@ -77,6 +78,15 @@ public final class HotbarOwnership {
 	 * selections are mid-flight) - that would read as "no conflict, nothing
 	 * to move" and leave both players stuck sharing the slot indefinitely,
 	 * instead of resolving it.
+	 *
+	 * <p>Selecting a hotbar slot is normally entirely client-driven - the
+	 * server only ever trusts whatever the client last reported, so forcing
+	 * a move here server-side would otherwise leave {@code player}'s own
+	 * client still believing (and rendering its lock frame on) the old slot,
+	 * while everyone else's broadcast correctly shows the new one - a
+	 * same-slot-shows-two-frames desync visible only to {@code player}
+	 * themselves. {@link ForceHotbarSlotPayload} tells their client to update
+	 * to match.
 	 */
 	public static void resolveSlotConflict(final MinecraftServer server, final ServerPlayer player) {
 		if (!PantheonConfig.get().enableHotbarOwnership) {
@@ -112,6 +122,7 @@ public final class HotbarOwnership {
 		for (int i = 0; i < HotbarOwnersPayload.SLOT_COUNT; i++) {
 			if (!takenByOthers[i]) {
 				player.getInventory().setSelectedSlot(i);
+				ServerPlayNetworking.send(player, new ForceHotbarSlotPayload(i));
 				return;
 			}
 		}

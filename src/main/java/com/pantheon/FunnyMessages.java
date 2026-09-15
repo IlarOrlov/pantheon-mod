@@ -1,5 +1,6 @@
 package com.pantheon;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -58,6 +59,29 @@ public final class FunnyMessages {
 		"%1$s never even saw %2$s do it. Lucky them."
 	);
 
+	/**
+	 * Cruder, swear-heavier one-liners in the same "blame the other guy" shape
+	 * as {@link #DEATH_TEMPLATES} - only mixed in when {@link PantheonConfig#crudeHumor}
+	 * is on (off by default). Profanity and insults only - no sexual content.
+	 */
+	private static final List<String> CRUDE_DEATH_TEMPLATES = List.of(
+		"%1$s is dead. %2$s is a fucking idiot.",
+		"%2$s screwed up, and %1$s paid with their damn life.",
+		"%1$s died. %2$s can go to hell for that one.",
+		"%2$s is dogshit at this game and %1$s suffered for it.",
+		"%1$s got wrecked because %2$s is a clown-ass moron.",
+		"%2$s: \"my bad.\" %1$s: \"you're a dumbass.\"",
+		"%1$s is dead. Someone tell %2$s they suck.",
+		"%2$s pulled some bullshit and %1$s died for it.",
+		"%1$s died. %2$s owes everyone a damn apology.",
+		"%2$s is a walking disaster and %1$s just found out the hard way.",
+		"%1$s got screwed over by %2$s's garbage-ass decisions.",
+		"%2$s: \"oops.\" %1$s: \"...you absolute donkey.\"",
+		"%1$s is toast. %2$s, you absolute muppet.",
+		"%2$s's brain wasn't loaded in, and now %1$s is dead.",
+		"%1$s died screaming %2$s's name. Not in a good way, you idiot."
+	);
+
 	private static final List<String> LOW_HEALTH_TEMPLATES = List.of(
 		"%s is basically a single hit away from a very funny death message.",
 		"%s's soul is currently held together with tape and vibes.",
@@ -71,11 +95,25 @@ public final class FunnyMessages {
 		"%s is one skeleton arrow away from ruining everyone's day."
 	);
 
-	/** A random death broadcast (random color too, so a chat full of them doesn't blur together) for a player killed only because their teammate's damage emptied the shared pool. */
-	public static Component randomPropagatedDeath(final String victimName, final String causeName) {
-		String template = DEATH_TEMPLATES.get(ThreadLocalRandom.current().nextInt(DEATH_TEMPLATES.size()));
+	/**
+	 * A random death broadcast (random color too, so a chat full of them
+	 * doesn't blur together) for a player killed only because their
+	 * teammate's damage emptied the shared pool. Draws from the cruder pool
+	 * too when {@code allowCrude} is on (mixed in with, not instead of, the
+	 * regular one), otherwise sticks to the regular pool entirely.
+	 */
+	public static Component randomPropagatedDeath(final String victimName, final String causeName, final boolean allowCrude) {
+		List<String> pool = allowCrude ? combine(DEATH_TEMPLATES, CRUDE_DEATH_TEMPLATES) : DEATH_TEMPLATES;
+		String template = pool.get(ThreadLocalRandom.current().nextInt(pool.size()));
 		ChatFormatting color = DEATH_COLORS.get(ThreadLocalRandom.current().nextInt(DEATH_COLORS.size()));
 		return Component.literal(String.format(template, victimName, causeName)).withStyle(color);
+	}
+
+	private static List<String> combine(final List<String> first, final List<String> second) {
+		List<String> combined = new ArrayList<>(first.size() + second.size());
+		combined.addAll(first);
+		combined.addAll(second);
+		return combined;
 	}
 
 	/** A random flavor line for the client-only low-health warning tint. */

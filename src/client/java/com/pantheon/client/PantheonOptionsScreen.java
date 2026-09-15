@@ -69,6 +69,11 @@ public final class PantheonOptionsScreen extends Screen {
 		content.addChild(toggleRow("Split into teams", this.working.teamsEnabled, v -> this.working.teamsEnabled = v));
 
 		content.addChild(spacer());
+		content.addChild(sectionLabel("Jokes"));
+		content.addChild(toggleRow("Crude jokes (mild swearing, off by default)",
+			this.working.crudeHumor, v -> this.working.crudeHumor = v));
+
+		content.addChild(spacer());
 		content.addChild(sectionLabel("This device only"));
 		content.addChild(toggleRow("Low-health screen warning",
 			PantheonClientConfig.get().lowHealthWarningEnabled, PantheonClientConfig::setLowHealthWarningEnabled));

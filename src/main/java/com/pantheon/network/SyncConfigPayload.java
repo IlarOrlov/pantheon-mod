@@ -21,7 +21,8 @@ public record SyncConfigPayload(
 	boolean syncHealth,
 	boolean syncHunger,
 	boolean syncExperience,
-	boolean teamsEnabled
+	boolean teamsEnabled,
+	boolean crudeHumor
 ) implements CustomPacketPayload {
 	public static final CustomPacketPayload.Type<SyncConfigPayload> TYPE = new CustomPacketPayload.Type<>(PantheonMod.id("sync_config"));
 
@@ -33,6 +34,7 @@ public record SyncConfigPayload(
 		ByteBufCodecs.BOOL, SyncConfigPayload::syncHunger,
 		ByteBufCodecs.BOOL, SyncConfigPayload::syncExperience,
 		ByteBufCodecs.BOOL, SyncConfigPayload::teamsEnabled,
+		ByteBufCodecs.BOOL, SyncConfigPayload::crudeHumor,
 		SyncConfigPayload::new
 	);
 
@@ -44,7 +46,8 @@ public record SyncConfigPayload(
 			config.syncHealth,
 			config.syncHunger,
 			config.syncExperience,
-			config.teamsEnabled
+			config.teamsEnabled,
+			config.crudeHumor
 		);
 	}
 
@@ -57,6 +60,7 @@ public record SyncConfigPayload(
 		config.syncHunger = this.syncHunger;
 		config.syncExperience = this.syncExperience;
 		config.teamsEnabled = this.teamsEnabled;
+		config.crudeHumor = this.crudeHumor;
 		return config;
 	}
 

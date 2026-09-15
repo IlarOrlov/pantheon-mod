@@ -39,6 +39,8 @@ public final class PantheonConfig {
 	public boolean syncExperience = false;
 	/** When on, sharing is scoped per-team ({@code /pantheon team}) instead of one pool for the whole server. */
 	public boolean teamsEnabled = true;
+	/** When on, the propagated-death jokes can also draw from a cruder, swear-heavier phrase pool. Off by default. */
+	public boolean crudeHumor = false;
 
 	public static PantheonConfig get() {
 		return instance;
@@ -97,6 +99,7 @@ public final class PantheonConfig {
 		copy.syncHunger = this.syncHunger;
 		copy.syncExperience = this.syncExperience;
 		copy.teamsEnabled = this.teamsEnabled;
+		copy.crudeHumor = this.crudeHumor;
 		return copy;
 	}
 }

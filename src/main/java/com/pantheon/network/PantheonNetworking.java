@@ -27,6 +27,7 @@ public final class PantheonNetworking {
 	public static void register() {
 		PayloadTypeRegistry.clientboundPlay().register(HotbarOwnersPayload.TYPE, HotbarOwnersPayload.CODEC);
 		PayloadTypeRegistry.clientboundPlay().register(SyncConfigPayload.TYPE, SyncConfigPayload.CODEC);
+		PayloadTypeRegistry.clientboundPlay().register(ForceHotbarSlotPayload.TYPE, ForceHotbarSlotPayload.CODEC);
 		PayloadTypeRegistry.serverboundPlay().register(UpdateConfigPayload.TYPE, UpdateConfigPayload.CODEC);
 		PayloadTypeRegistry.serverboundPlay().register(RequestSlotPayload.TYPE, RequestSlotPayload.CODEC);
 
