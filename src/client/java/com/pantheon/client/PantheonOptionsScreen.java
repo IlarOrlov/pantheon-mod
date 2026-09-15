@@ -60,7 +60,7 @@ public final class PantheonOptionsScreen extends Screen {
 
 		content.addChild(spacer());
 		content.addChild(sectionLabel("Shared vitals"));
-		content.addChild(toggleRow("Share health toggle", this.working.syncHealth, v -> this.working.syncHealth = v));
+		content.addChild(toggleRow("Share health", this.working.syncHealth, v -> this.working.syncHealth = v));
 		content.addChild(toggleRow("Share hunger", this.working.syncHunger, v -> this.working.syncHunger = v));
 		content.addChild(toggleRow("Share XP", this.working.syncExperience, v -> this.working.syncExperience = v));
 
@@ -70,7 +70,7 @@ public final class PantheonOptionsScreen extends Screen {
 
 		content.addChild(spacer());
 		content.addChild(sectionLabel("Jokes"));
-		content.addChild(toggleRow("Crude jokes (mild swearing, off by default)",
+		content.addChild(toggleRow("Crude jokes",
 			this.working.crudeHumor, v -> this.working.crudeHumor = v));
 
 		content.addChild(spacer());
