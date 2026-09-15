@@ -18,48 +18,44 @@ public final class FunnyMessages {
 	private FunnyMessages() {
 	}
 
+	/** Bright, easy-to-read colors for chat, cycled randomly so death messages don't all look the same. */
+	private static final List<ChatFormatting> DEATH_COLORS = List.of(
+		ChatFormatting.RED, ChatFormatting.GOLD, ChatFormatting.YELLOW, ChatFormatting.GREEN,
+		ChatFormatting.AQUA, ChatFormatting.LIGHT_PURPLE, ChatFormatting.BLUE
+	);
+
+	/** Simple, blunt, "blame the other guy" one-liners - the joke should land in one read, no unpacking required. */
 	private static final List<String> DEATH_TEMPLATES = List.of(
-		"%1$s keeled over the instant %2$s stubbed a toe on the shared life bar.",
-		"%1$s and %2$s were on the same life support, and %2$s just unplugged it.",
-		"Somewhere, a butterfly flapped its wings, %2$s got hit, and %1$s dropped dead.",
-		"%1$s discovered the hard way that %2$s's pain is everyone's pain.",
-		"%1$s just experienced %2$s's near-death experience, except it wasn't near.",
-		"%2$s sneezed near a creeper and %1$s's soul left the building.",
-		"The group HP bar hit zero because of %2$s, and %1$s was just standing there minding their own business.",
-		"%1$s has been voted off the island by %2$s's poor decision-making.",
-		"%2$s took one for the team, which unfortunately meant %1$s took it too.",
-		"%1$s's last words: \"why do I feel what %2$s is feeling.\"",
-		"%1$s got emotionally damaged by %2$s's physical damage.",
-		"Shared health: the feature where %2$s falls in lava and %1$s just... also dies.",
-		"%1$s filed a complaint against %2$s, posthumously.",
-		"%2$s walked into a cactus and somehow %1$s is the one respawning.",
-		"%1$s was three biomes away, perfectly safe, until %2$s wasn't.",
-		"%1$s's cause of death: extreme empathy toward %2$s.",
-		"%2$s challenged a skeleton to a staring contest and lost, taking %1$s down with them.",
-		"%1$s never even loaded the chunk %2$s died in, yet here we are.",
-		"%2$s said \"watch this\" and %1$s paid the price.",
-		"%1$s has entered the chat. Also, %1$s has left the chat. Thanks, %2$s.",
-		"%2$s forgot which button was sprint and which was jump off the cliff. %1$s forgives them. Probably.",
-		"%1$s's health bar just wanted to see the world burn, courtesy of %2$s.",
-		"In an act of true friendship, %1$s died exactly when %2$s did.",
-		"%2$s tried to pet a wolf. It was not a wolf. %1$s is also dead now.",
-		"%1$s would like it on record that %2$s is banned from lava biomes forever.",
-		"%2$s's fall damage became %1$s's whole personality, briefly.",
-		"%1$s got zero warning, zero mercy, and zero HP, all thanks to %2$s.",
-		"%2$s: \"I've got this.\" %1$s: *dies from across the map*",
-		"%1$s just learned that friendship is a shared damage pool.",
-		"%2$s punched a bee. The bee won. %1$s also lost, somehow.",
-		"%1$s's tombstone reads: \"here lies someone who trusted %2$s.\"",
-		"%2$s pressed F to pay respects a little too literally, and %1$s went with them.",
-		"%1$s was out here vibing when %2$s decided today was not the day.",
-		"%2$s's skill issue became %1$s's fatal issue.",
-		"%1$s died of secondhand fall damage from %2$s.",
-		"%2$s aggroed the entire zombie horde. %1$s aggroed nothing and died anyway.",
-		"%1$s respectfully requests that %2$s stop doing that.",
-		"%2$s lost a fight with a chicken. %1$s lost their life over it.",
-		"%1$s's last thought: \"I don't even know a %2$s.\"",
-		"%2$s tested if fire hurts. It does. %1$s can confirm, from experience.",
-		"The bond between %1$s and %2$s was truly unbreakable, right up until %2$s broke it."
+		"%1$s died because %2$s can't aim.",
+		"%1$s got yeeted into the void, courtesy of %2$s.",
+		"%2$s sneezed. %1$s died. Science can't explain it.",
+		"%1$s: \"I didn't even do anything!\" Correct. %2$s did.",
+		"%1$s has died. Cause of death: being friends with %2$s.",
+		"%2$s said \"hold my beer\" and now %1$s is dead.",
+		"%1$s got got. Blame %2$s.",
+		"RIP %1$s. %2$s says sorry. Kind of.",
+		"%1$s is dead because %2$s exists.",
+		"%1$s just learned the hard way that %2$s is bad at this game.",
+		"%2$s: \"oops.\" %1$s: dead.",
+		"%1$s died. Somewhere, %2$s is laughing nervously.",
+		"%1$s's HP hit zero because %2$s hit a skeleton with their face.",
+		"%2$s discovered gravity. %1$s discovered death.",
+		"%1$s would like everyone to know %2$s did this.",
+		"%2$s messed up big time, and %1$s paid for it. With their life.",
+		"%1$s is now a ghost thanks to %2$s's terrible decisions.",
+		"%2$s pressed the wrong button. %1$s pressed uninstall on life.",
+		"%1$s died of embarrassment on %2$s's behalf.",
+		"%2$s got outplayed by a chicken. %1$s got outplayed by fate.",
+		"%2$s: \"trust me.\" %1$s: dies.",
+		"%1$s died. Please direct all complaints to %2$s.",
+		"%2$s took fall damage. %1$s took the L.",
+		"%1$s's last words: \"not like this... because of %2$s.\"",
+		"%2$s walked into fire. %1$s felt the burn from across the map.",
+		"%1$s didn't stand a chance. Neither did %2$s's common sense.",
+		"%2$s made a bad call. %1$s made the ultimate sacrifice.",
+		"%1$s is deceased. %2$s is the reason. Everyone knows it.",
+		"%2$s got clowned by a zombie. %1$s got clowned by association.",
+		"%1$s never even saw %2$s do it. Lucky them."
 	);
 
 	private static final List<String> LOW_HEALTH_TEMPLATES = List.of(
@@ -75,10 +71,11 @@ public final class FunnyMessages {
 		"%s is one skeleton arrow away from ruining everyone's day."
 	);
 
-	/** A random death broadcast for a player killed only because their teammate's damage emptied the shared pool. */
+	/** A random death broadcast (random color too, so a chat full of them doesn't blur together) for a player killed only because their teammate's damage emptied the shared pool. */
 	public static Component randomPropagatedDeath(final String victimName, final String causeName) {
 		String template = DEATH_TEMPLATES.get(ThreadLocalRandom.current().nextInt(DEATH_TEMPLATES.size()));
-		return Component.literal(String.format(template, victimName, causeName)).withStyle(ChatFormatting.GOLD);
+		ChatFormatting color = DEATH_COLORS.get(ThreadLocalRandom.current().nextInt(DEATH_COLORS.size()));
+		return Component.literal(String.format(template, victimName, causeName)).withStyle(color);
 	}
 
 	/** A random flavor line for the client-only low-health warning tint. */

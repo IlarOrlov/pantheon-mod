@@ -43,7 +43,7 @@ public class PantheonMod implements ModInitializer {
 			// The joining player's own hotbar selection is loaded from their personal
 			// save data and may already be "owned" by someone else who's mid-session -
 			// move them to a free slot instead of contending for an occupied one.
-			HotbarOwnership.resolveJoinConflict(server, handler.player);
+			HotbarOwnership.resolveSlotConflict(server, handler.player);
 			// Their Inventory already points at the shared list (see InventorySharingMixin),
 			// but a fresh menu's diff-against-nothing might take a tick to catch up -
 			// force it immediately so they see the current shared contents right away.

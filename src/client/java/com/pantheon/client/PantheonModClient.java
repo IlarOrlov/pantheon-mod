@@ -85,10 +85,17 @@ public class PantheonModClient implements ClientModInitializer {
 
 	private static boolean isRequestSlotKeyPhysicallyDown(final Minecraft client) {
 		InputConstants.Key key = ((KeyMappingKeyAccessor) requestSlotKey).pantheon$getKey();
-		if (key.getType() != InputConstants.Type.KEYSYM || key.equals(InputConstants.UNKNOWN)) {
+		if (key.equals(InputConstants.UNKNOWN)) {
 			return false;
 		}
-		return InputConstants.isKeyDown(client.getWindow(), key.getValue());
+		if (key.getType() == InputConstants.Type.MOUSE) {
+			long handle = client.getWindow().handle();
+			return org.lwjgl.glfw.GLFW.glfwGetMouseButton(handle, key.getValue()) == org.lwjgl.glfw.GLFW.GLFW_PRESS;
+		}
+		if (key.getType() == InputConstants.Type.KEYSYM) {
+			return InputConstants.isKeyDown(client.getWindow(), key.getValue());
+		}
+		return false;
 	}
 
 	/**

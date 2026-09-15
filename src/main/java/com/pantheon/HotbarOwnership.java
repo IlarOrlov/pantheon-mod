@@ -64,32 +64,53 @@ public final class HotbarOwnership {
 
 	/**
 	 * If {@code player}'s currently selected slot (loaded from their own save
-	 * data, or just wherever they left off) is already owned by a different
-	 * online teammate, moves them to the first free slot instead of contending
-	 * for an occupied one. With the {@link PantheonConfig#HOTBAR_OWNERSHIP_PLAYER_CAP}
-	 * per-team join limit in place there's always at least one free slot for a
-	 * player who just successfully joined their team.
+	 * data on join, or carried over from before they died on respawn) is also
+	 * selected by a different online teammate, moves {@code player} to the
+	 * first free slot instead of leaving two players contending for the same
+	 * one. With the {@link PantheonConfig#HOTBAR_OWNERSHIP_PLAYER_CAP}
+	 * per-team join limit in place there's always at least one free slot.
+	 *
+	 * <p>This deliberately scans {@code members}' own selected slots directly
+	 * rather than going through {@link #currentOwners}, which would collapse
+	 * a genuine two-player collision on {@code player}'s slot into "unowned"
+	 * (its tie-breaking rule for a <em>momentary</em> tie while two clients'
+	 * selections are mid-flight) - that would read as "no conflict, nothing
+	 * to move" and leave both players stuck sharing the slot indefinitely,
+	 * instead of resolving it.
 	 */
-	public static void resolveJoinConflict(final MinecraftServer server, final ServerPlayer player) {
+	public static void resolveSlotConflict(final MinecraftServer server, final ServerPlayer player) {
 		if (!PantheonConfig.get().enableHotbarOwnership) {
 			return;
 		}
 
 		Team team = TeamManager.teamOf(player);
-		List<UUID> owners = currentOwners(TeamManager.onlineMembersOf(team, server));
+		List<ServerPlayer> members = TeamManager.onlineMembersOf(team, server);
 		int mySlot = player.getInventory().getSelectedSlot();
 		if (mySlot < 0 || mySlot >= HotbarOwnersPayload.SLOT_COUNT) {
 			return;
 		}
 
-		UUID owner = owners.get(mySlot);
-		if (owner.equals(HotbarOwnersPayload.NO_OWNER) || owner.equals(player.getUUID())) {
+		boolean[] takenByOthers = new boolean[HotbarOwnersPayload.SLOT_COUNT];
+		boolean contested = false;
+		for (ServerPlayer other : members) {
+			if (other == player) {
+				continue;
+			}
+			int slot = other.getInventory().getSelectedSlot();
+			if (slot < 0 || slot >= HotbarOwnersPayload.SLOT_COUNT) {
+				continue;
+			}
+			takenByOthers[slot] = true;
+			if (slot == mySlot) {
+				contested = true;
+			}
+		}
+		if (!contested) {
 			return;
 		}
 
 		for (int i = 0; i < HotbarOwnersPayload.SLOT_COUNT; i++) {
-			UUID other = owners.get(i);
-			if (other.equals(HotbarOwnersPayload.NO_OWNER) || other.equals(player.getUUID())) {
+			if (!takenByOthers[i]) {
 				player.getInventory().setSelectedSlot(i);
 				return;
 			}
