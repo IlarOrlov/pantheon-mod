@@ -6,6 +6,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import com.pantheon.HotbarOwnership;
+import com.pantheon.PantheonMod;
 
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
@@ -29,6 +30,8 @@ public abstract class HotbarRespawnMixin {
 		if (respawned == null) {
 			return;
 		}
+		PantheonMod.LOGGER.info("[HotbarRespawnMixin] {} respawned, selected slot carried over = {}",
+			respawned.getGameProfile().name(), respawned.getInventory().getSelectedSlot());
 		MinecraftServer server = ((PlayerList) (Object) this).getServer();
 		HotbarOwnership.resolveSlotConflict(server, respawned);
 		respawned.inventoryMenu.broadcastFullState();

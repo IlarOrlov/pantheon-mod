@@ -41,7 +41,11 @@ public class PantheonModClient implements ClientModInitializer {
 	public void onInitializeClient() {
 		PantheonClientConfig.load();
 
-		ClientPlayNetworking.registerGlobalReceiver(HotbarOwnersPayload.TYPE, (payload, context) -> hotbarOwners = payload.owners());
+		ClientPlayNetworking.registerGlobalReceiver(HotbarOwnersPayload.TYPE, (payload, context) -> {
+			hotbarOwners = payload.owners();
+			int localSelected = context.player() != null ? context.player().getInventory().getSelectedSlot() : -1;
+			PantheonMod.LOGGER.info("[PantheonModClient] received owners={} (our own selected slot locally = {})", payload.owners(), localSelected);
+		});
 		ClientPlayNetworking.registerGlobalReceiver(SyncConfigPayload.TYPE, (payload, context) -> lastKnownConfig = payload.toConfig());
 		// The server just forced our selected slot to move (a join/respawn
 		// conflict with a teammate) - selection is otherwise entirely
@@ -49,6 +53,7 @@ public class PantheonModClient implements ClientModInitializer {
 		// learn about a server-side move, and effectiveOwner()'s local
 		// prediction would keep showing our frame on the old slot too.
 		ClientPlayNetworking.registerGlobalReceiver(ForceHotbarSlotPayload.TYPE, (payload, context) -> {
+			PantheonMod.LOGGER.info("[PantheonModClient] received ForceHotbarSlotPayload: forced to slot {}", payload.slot());
 			if (context.player() != null) {
 				context.player().getInventory().setSelectedSlot(payload.slot());
 			}

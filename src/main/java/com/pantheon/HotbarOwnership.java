@@ -116,6 +116,8 @@ public final class HotbarOwnership {
 			}
 		}
 		if (!contested) {
+			PantheonMod.LOGGER.info("[HotbarOwnership] resolveSlotConflict: {} on slot {} in team '{}' - no conflict",
+				player.getGameProfile().name(), mySlot, team.name);
 			return;
 		}
 
@@ -123,9 +125,13 @@ public final class HotbarOwnership {
 			if (!takenByOthers[i]) {
 				player.getInventory().setSelectedSlot(i);
 				ServerPlayNetworking.send(player, new ForceHotbarSlotPayload(i));
+				PantheonMod.LOGGER.info("[HotbarOwnership] resolveSlotConflict: {} moved from contested slot {} to {} in team '{}'",
+					player.getGameProfile().name(), mySlot, i, team.name);
 				return;
 			}
 		}
+		PantheonMod.LOGGER.info("[HotbarOwnership] resolveSlotConflict: {} contested on slot {} in team '{}' but no free slot found",
+			player.getGameProfile().name(), mySlot, team.name);
 	}
 
 	/** Recomputes ownership per online team and, only for teams where it changed since the last check, pushes it to that team's clients. */
@@ -152,9 +158,39 @@ public final class HotbarOwnership {
 	private static void sendToTeam(final Team team, final List<ServerPlayer> members, final List<UUID> owners) {
 		team.lastBroadcastOwners = owners;
 
+		PantheonMod.LOGGER.info("[HotbarOwnership] broadcast to team '{}' ({} members): {}", team.name, members.size(), describe(members, owners));
+
 		HotbarOwnersPayload payload = new HotbarOwnersPayload(owners);
 		for (ServerPlayer player : members) {
 			ServerPlayNetworking.send(player, payload);
 		}
+	}
+
+	/** Renders the owners list as "name(slot=selected)" for every member, plus the raw owner UUID-or-name per slot, for diagnostic logging. */
+	private static String describe(final List<ServerPlayer> members, final List<UUID> owners) {
+		StringBuilder sb = new StringBuilder();
+		for (ServerPlayer player : members) {
+			sb.append(player.getGameProfile().name()).append("(selected=").append(player.getInventory().getSelectedSlot()).append(") ");
+		}
+		sb.append("| owners=[");
+		for (int i = 0; i < owners.size(); i++) {
+			UUID owner = owners.get(i);
+			String name = HotbarOwnersPayload.NO_OWNER.equals(owner) ? "-" : nameOf(members, owner);
+			sb.append(i).append(':').append(name);
+			if (i < owners.size() - 1) {
+				sb.append(' ');
+			}
+		}
+		sb.append(']');
+		return sb.toString();
+	}
+
+	private static String nameOf(final List<ServerPlayer> members, final UUID uuid) {
+		for (ServerPlayer player : members) {
+			if (player.getUUID().equals(uuid)) {
+				return player.getGameProfile().name();
+			}
+		}
+		return uuid.toString();
 	}
 }
