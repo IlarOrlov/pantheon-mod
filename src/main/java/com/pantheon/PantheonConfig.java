@@ -6,6 +6,7 @@ import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -61,25 +62,41 @@ public final class PantheonConfig {
 				PantheonConfig loaded = GSON.fromJson(reader, PantheonConfig.class);
 				if (loaded != null) {
 					instance = loaded;
+					PantheonMod.LOGGER.info("[PantheonConfig] Loaded config/pantheon.json: {}", describe(instance));
+				} else {
+					PantheonMod.LOGGER.warn("[PantheonConfig] config/pantheon.json parsed as null - keeping defaults: {}", describe(instance));
 				}
 			} catch (IOException | RuntimeException e) {
-				PantheonMod.LOGGER.warn("Failed to read config/pantheon.json, using defaults", e);
+				PantheonMod.LOGGER.warn("[PantheonConfig] Failed to read config/pantheon.json, using defaults: {}", describe(instance), e);
 			}
+		} else {
+			PantheonMod.LOGGER.info("[PantheonConfig] No config/pantheon.json yet - using defaults: {}", describe(instance));
 		}
 		save();
 	}
 
+	/**
+	 * Writes to a temporary sibling file and atomically moves it over the
+	 * real one, so a write that's interrupted (crash, forced process kill,
+	 * the game closing mid-write) can never leave {@code pantheon.json} in a
+	 * half-written, unparseable state - which {@link #load} would otherwise
+	 * silently treat as "no valid config" and quietly reset to defaults, on
+	 * top of the actual data loss from the interrupted write itself.
+	 */
 	public static synchronized void save() {
 		if (configPath == null) {
 			configPath = FabricLoader.getInstance().getConfigDir().resolve("pantheon.json");
 		}
 		try {
 			Files.createDirectories(configPath.getParent());
-			try (Writer writer = Files.newBufferedWriter(configPath, StandardCharsets.UTF_8)) {
+			Path tmp = configPath.resolveSibling("pantheon.json.tmp");
+			try (Writer writer = Files.newBufferedWriter(tmp, StandardCharsets.UTF_8)) {
 				GSON.toJson(instance, writer);
 			}
+			Files.move(tmp, configPath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+			PantheonMod.LOGGER.info("[PantheonConfig] Saved config/pantheon.json: {}", describe(instance));
 		} catch (IOException e) {
-			PantheonMod.LOGGER.warn("Failed to write config/pantheon.json", e);
+			PantheonMod.LOGGER.warn("[PantheonConfig] Failed to write config/pantheon.json", e);
 		}
 	}
 
@@ -101,5 +118,16 @@ public final class PantheonConfig {
 		copy.teamsEnabled = this.teamsEnabled;
 		copy.crudeHumor = this.crudeHumor;
 		return copy;
+	}
+
+	private static String describe(final PantheonConfig config) {
+		return "syncArmor=" + config.syncArmor
+			+ ", syncOffhand=" + config.syncOffhand
+			+ ", enableHotbarOwnership=" + config.enableHotbarOwnership
+			+ ", syncHealth=" + config.syncHealth
+			+ ", syncHunger=" + config.syncHunger
+			+ ", syncExperience=" + config.syncExperience
+			+ ", teamsEnabled=" + config.teamsEnabled
+			+ ", crudeHumor=" + config.crudeHumor;
 	}
 }

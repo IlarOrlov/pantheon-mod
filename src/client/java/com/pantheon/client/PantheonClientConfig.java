@@ -6,6 +6,7 @@ import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -53,9 +54,11 @@ public final class PantheonClientConfig {
 		}
 		try {
 			Files.createDirectories(configPath.getParent());
-			try (Writer writer = Files.newBufferedWriter(configPath, StandardCharsets.UTF_8)) {
+			Path tmp = configPath.resolveSibling("pantheon-client.json.tmp");
+			try (Writer writer = Files.newBufferedWriter(tmp, StandardCharsets.UTF_8)) {
 				GSON.toJson(instance, writer);
 			}
+			Files.move(tmp, configPath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
 		} catch (IOException e) {
 			PantheonMod.LOGGER.warn("Failed to write config/pantheon-client.json", e);
 		}

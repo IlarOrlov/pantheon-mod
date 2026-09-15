@@ -6,6 +6,7 @@ import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -91,8 +92,10 @@ public final class TeamManager {
 				PantheonMod.LOGGER.warn("Failed to read config/pantheon-teams.json, starting with no custom teams", e);
 			}
 		}
+		PantheonMod.LOGGER.info("[TeamManager] Loaded teams={}, assignments={}", teams.keySet(), assignments);
 	}
 
+	/** Writes to a temp sibling file and atomically moves it into place - see {@link PantheonConfig#save} for why. */
 	public static synchronized void save() {
 		if (configPath == null) {
 			configPath = FabricLoader.getInstance().getConfigDir().resolve("pantheon-teams.json");
@@ -112,11 +115,14 @@ public final class TeamManager {
 
 		try {
 			Files.createDirectories(configPath.getParent());
-			try (Writer writer = Files.newBufferedWriter(configPath, StandardCharsets.UTF_8)) {
+			Path tmp = configPath.resolveSibling("pantheon-teams.json.tmp");
+			try (Writer writer = Files.newBufferedWriter(tmp, StandardCharsets.UTF_8)) {
 				GSON.toJson(persisted, writer);
 			}
+			Files.move(tmp, configPath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+			PantheonMod.LOGGER.info("[TeamManager] Saved teams={}, assignments={}", teams.keySet(), assignments);
 		} catch (IOException e) {
-			PantheonMod.LOGGER.warn("Failed to write config/pantheon-teams.json", e);
+			PantheonMod.LOGGER.warn("[TeamManager] Failed to write config/pantheon-teams.json", e);
 		}
 	}
 

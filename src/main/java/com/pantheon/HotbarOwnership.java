@@ -17,8 +17,12 @@ import net.minecraft.server.level.ServerPlayer;
  * Decides which online player "owns" each hotbar slot right now, scoped to
  * one {@link Team} at a time: whichever slot a player currently has selected
  * is theirs, as long as nobody else <em>on their team</em> has also selected
- * it (a momentary tie leaves the slot unowned rather than picking a winner).
- * That player's color is framed around the slot for their teammates
+ * it (a momentary tie leaves the slot unowned rather than picking a winner),
+ * and as long as they're actually alive - a player sitting on the death
+ * screen isn't using their slot, so it's freed (frame gone, teammates can
+ * take it) for as long as they're dead, and re-claimed automatically the
+ * moment they respawn. That player's color is framed around the slot for
+ * their teammates
  * ({@link com.pantheon.client.HotbarOwnerOverlay}), and nobody else on the
  * team can touch it or select it themselves
  * ({@link com.pantheon.mixin.HotbarLockMixin}, {@link com.pantheon.mixin.HotbarSelectionCapMixin}).
@@ -42,6 +46,12 @@ public final class HotbarOwnership {
 		int[] selectedCount = new int[HotbarOwnersPayload.SLOT_COUNT];
 		UUID[] selectedBy = new UUID[HotbarOwnersPayload.SLOT_COUNT];
 		for (ServerPlayer player : members) {
+			if (player.getHealth() <= 0f) {
+				// Dead, sitting on the death screen awaiting their own respawn
+				// click - not actually using this slot right now, so don't
+				// hold it hostage from the rest of the team while they're gone.
+				continue;
+			}
 			int slot = player.getInventory().getSelectedSlot();
 			if (slot >= 0 && slot < HotbarOwnersPayload.SLOT_COUNT) {
 				selectedCount[slot]++;
@@ -114,7 +124,9 @@ public final class HotbarOwnership {
 		boolean[] takenByOthers = new boolean[HotbarOwnersPayload.SLOT_COUNT];
 		boolean contested = false;
 		for (ServerPlayer other : members) {
-			if (other == player) {
+			if (other == player || other.getHealth() <= 0f) {
+				// Skip dead teammates too - their slot is already free (see
+				// currentOwners), so it shouldn't block this player from it.
 				continue;
 			}
 			int slot = other.getInventory().getSelectedSlot();
