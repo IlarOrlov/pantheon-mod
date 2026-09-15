@@ -60,26 +60,62 @@ public final class FunnyMessages {
 	);
 
 	/**
-	 * Cruder, swear-heavier one-liners in the same "blame the other guy" shape
-	 * as {@link #DEATH_TEMPLATES} - only mixed in when {@link PantheonConfig#crudeHumor}
-	 * is on (off by default). Profanity and insults only - no sexual content.
+	 * A cruder alternate pool in the same "blame the other guy" shape as
+	 * {@link #DEATH_TEMPLATES} - only mixed in when {@link PantheonConfig#crudeHumor}
+	 * is on (off by default).
 	 */
 	private static final List<String> CRUDE_DEATH_TEMPLATES = List.of(
-		"%1$s is dead. %2$s is a fucking idiot.",
-		"%2$s screwed up, and %1$s paid with their damn life.",
-		"%1$s died. %2$s can go to hell for that one.",
-		"%2$s is dogshit at this game and %1$s suffered for it.",
-		"%1$s got wrecked because %2$s is a clown-ass moron.",
-		"%2$s: \"my bad.\" %1$s: \"you're a dumbass.\"",
-		"%1$s is dead. Someone tell %2$s they suck.",
-		"%2$s pulled some bullshit and %1$s died for it.",
-		"%1$s died. %2$s owes everyone a damn apology.",
-		"%2$s is a walking disaster and %1$s just found out the hard way.",
-		"%1$s got screwed over by %2$s's garbage-ass decisions.",
-		"%2$s: \"oops.\" %1$s: \"...you absolute donkey.\"",
-		"%1$s is toast. %2$s, you absolute muppet.",
-		"%2$s's brain wasn't loaded in, and now %1$s is dead.",
-		"%1$s died screaming %2$s's name. Not in a good way, you idiot."
+		"%1$s died. %2$s was just too hot to handle.",
+		"%1$s couldn't resist %2$s's charms.",
+		"%2$s walked in, looked good, and %1$s immediately lost all HP.",
+		"%1$s's heart couldn't handle %2$s looking that damn good.",
+		"%2$s didn't kill %1$s. The sexual tension did.",
+		"%1$s got distracted by %2$s and forgot how to survive.",
+		"%2$s brought the looks. %1$s brought absolutely no resistance.",
+		"%1$s saw %2$s and suddenly forgot how legs work.",
+		"%2$s is dangerously attractive. %1$s learned that the hard way.",
+		"%1$s died from excessive exposure to %2$s's sex appeal.",
+		"%2$s's charm dealt critical damage to %1$s.",
+		"%1$s couldn't handle the heat coming from %2$s.",
+		"%2$s winked. %1$s's health bar disappeared.",
+		"%1$s was defeated by %2$s's irresistible energy.",
+		"%2$s entered the room and %1$s immediately became weak at the knees.",
+		"%1$s had one job: resist %2$s. They failed.",
+		"%2$s's presence was apparently more lethal than a diamond sword.",
+		"%1$s didn't stand a chance against that much attraction.",
+		"%2$s was looking suspiciously good today. %1$s paid the price.",
+		"%1$s got seduced by the danger and paid for it.",
+		"%2$s's flirting technique: apparently lethal.",
+		"%1$s's final weakness: apparently %2$s.",
+		"%2$s turned up the heat. %1$s's HP turned itself off.",
+		"%1$s was already weak. Then %2$s showed up looking like that.",
+		"%2$s has been officially classified as a dangerous temptation.",
+		"%1$s couldn't decide whether to run or flirt. They chose poorly.",
+		"%2$s said \"come closer.\" %1$s should have known better.",
+		"%1$s got a little too close to %2$s and paid dearly for it.",
+		"%2$s's body language dealt more damage than their weapon.",
+		"%1$s was flirting with danger. Unfortunately, danger was named %2$s.",
+		"%2$s has enough charisma to be considered a deadly weapon.",
+		"%1$s's HP wasn't ready for that much sexual tension.",
+		"%2$s came looking irresistible and left %1$s dead.",
+		"%1$s's downfall was having absolutely no resistance to %2$s.",
+		"%2$s is proof that being attractive can be a combat ability.",
+		"%1$s couldn't survive the combination of danger and good looks.",
+		"%2$s gave %1$s butterflies. Unfortunately, they were fatal.",
+		"%1$s's last mistake was making eye contact with %2$s.",
+		"%2$s didn't need a weapon. That smile was enough.",
+		"%1$s got absolutely overwhelmed by the chemistry.",
+		"%2$s walked past and %1$s's survival instincts clocked out.",
+		"%1$s was defeated by temptation.",
+		"%2$s's aura is apparently NSFW.",
+		"%1$s died, but at least they died attracted.",
+		"%2$s: \"Are you sure you want to get closer?\" %1$s: \"Absolutely.\"",
+		"%1$s should've known better than to flirt with %2$s.",
+		"%2$s was serving looks. %1$s was serving their final death message.",
+		"%1$s's health bar wasn't the only thing getting weak around %2$s.",
+		"%2$s has dangerous levels of bedroom energy.",
+		"%1$s got caught in %2$s's irresistible orbit.",
+		"%2$s's charm stat is apparently maxed out."
 	);
 
 	private static final List<String> LOW_HEALTH_TEMPLATES = List.of(
