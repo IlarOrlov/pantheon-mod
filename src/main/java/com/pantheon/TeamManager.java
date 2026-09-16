@@ -34,10 +34,11 @@ import net.minecraft.server.level.ServerPlayer;
  *
  * <p>Which teams exist and who's assigned to them persists in
  * {@code config/pantheon-teams.json} (loaded fresh on every server start via
- * {@link #load()}), same as {@link PantheonConfig}'s settings - but each
- * {@link Team}'s actual contents (items, equipment, hotbar/health/hunger/xp
- * tracking) are session-only and always start empty, same as the old single
- * pool always did.
+ * {@link #load}), same as {@link PantheonConfig}'s settings. Each
+ * {@link Team}'s shared items and armor/offhand persist with the world
+ * itself via {@link TeamContentsSavedData}, so they survive leaving and
+ * re-entering a world; the rest of a team's state (hotbar/health/hunger/xp
+ * tracking) is session-only and starts fresh each time.
  */
 public final class TeamManager {
 	public static final String GLOBAL_TEAM_NAME = "global";
@@ -56,12 +57,13 @@ public final class TeamManager {
 	}
 
 	/**
-	 * Rebuilds every team from scratch (so session-only state starts fresh)
-	 * and re-reads which teams exist and who's on them from disk. Called on
-	 * every server start (dedicated boot, or re-entering a singleplayer
-	 * world), same event that already resets the shared inventory.
+	 * Rebuilds every team from scratch (so session-only state starts fresh),
+	 * re-reads which teams exist and who's on them from the config file, then
+	 * restores each team's shared items/equipment from the world's saved data.
+	 * Called on every server start (dedicated boot, or re-entering a
+	 * singleplayer world), before any player has joined.
 	 */
-	public static synchronized void load() {
+	public static synchronized void load(final MinecraftServer server) {
 		teams.clear();
 		assignments.clear();
 		teams.put(GLOBAL_TEAM_NAME, new Team(GLOBAL_TEAM_NAME));
@@ -92,7 +94,27 @@ public final class TeamManager {
 				PantheonMod.LOGGER.warn("Failed to read config/pantheon-teams.json, starting with no custom teams", e);
 			}
 		}
-		PantheonMod.LOGGER.info("[TeamManager] Loaded teams={}, assignments={}", teams.keySet(), assignments);
+
+		TeamContentsSavedData saved = server.getDataStorage().computeIfAbsent(TeamContentsSavedData.TYPE);
+		for (Map.Entry<String, TeamContentsSavedData.TeamContents> entry : saved.loaded().entrySet()) {
+			// A team that was deleted via /pantheon team since the world was last saved
+			// stays gone - don't resurrect it just because its items are still on disk.
+			Team team = teams.get(entry.getKey());
+			if (team != null) {
+				entry.getValue().applyTo(team);
+			}
+		}
+		PantheonMod.LOGGER.info("[TeamManager] Loaded teams={}, assignments={}, restored contents for {}",
+			teams.keySet(), assignments, saved.loaded().keySet());
+	}
+
+	/**
+	 * Flags the shared contents for inclusion in the world save that's about
+	 * to happen. The saved-data codec reads the live teams directly, so this
+	 * only has to mark it dirty.
+	 */
+	public static void markDirty(final MinecraftServer server) {
+		server.getDataStorage().computeIfAbsent(TeamContentsSavedData.TYPE).setDirty();
 	}
 
 	/** Writes to a temp sibling file and atomically moves it into place - see {@link PantheonConfig#save} for why. */

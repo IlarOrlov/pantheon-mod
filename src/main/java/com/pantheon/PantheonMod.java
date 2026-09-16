@@ -32,11 +32,15 @@ public class PantheonMod implements ModInitializer {
 		PantheonCommands.register();
 
 		ServerLifecycleEvents.SERVER_STARTING.register(server -> {
-			TeamManager.load();
+			TeamManager.load(server);
 			// A death that drops/clears the shared inventory would empty it for every
 			// player at once, not just the one who died - keepInventory is required.
 			server.getGameRules().set(GameRules.KEEP_INVENTORY, Boolean.TRUE, server);
 		});
+
+		// Shared items live in the world's saved data rather than any one player's
+		// file - make sure they go out with every world save (autosave, pause, stop).
+		ServerLifecycleEvents.BEFORE_SAVE.register((server, flush, force) -> TeamManager.markDirty(server));
 
 		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
 			PantheonNetworking.sendConfigTo(handler.player);

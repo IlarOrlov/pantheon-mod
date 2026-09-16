@@ -55,10 +55,11 @@ public abstract class InventorySharingMixin implements PantheonInventoryAccess {
 	 * from the joining player's own saved data - for a ServerPlayer that would
 	 * wipe the *shared* list (everyone on their team's items) down to just
 	 * whatever this one player personally had saved from their last session.
-	 * The shared inventory is memory-only by design (reset once, on server
-	 * start) and must never be touched by a single player's save file, so this
-	 * just skips loading entirely for ServerPlayers - their current items stay
-	 * whatever the shared inventory already has.
+	 * The shared inventory persists with the world instead (see
+	 * {@link com.pantheon.TeamContentsSavedData}) and must never be touched by
+	 * a single player's save file, so this just skips loading entirely for
+	 * ServerPlayers - their current items stay whatever the shared inventory
+	 * already has.
 	 */
 	@Inject(method = "load", at = @At("HEAD"), cancellable = true)
 	private void pantheon$skipLoadForServerPlayers(final ValueInput.TypedInputList<ItemStackWithSlot> list, final CallbackInfo ci) {

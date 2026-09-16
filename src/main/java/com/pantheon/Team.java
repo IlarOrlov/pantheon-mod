@@ -13,7 +13,9 @@ import net.minecraft.world.item.ItemStack;
 /**
  * One independent shared-everything group: its own 36-slot inventory, its
  * own armor/offhand map, and its own hotbar-ownership/health/hunger tracking
- * state. When {@link PantheonConfig#teamsEnabled} is off, every player
+ * state. Items and equipment persist with the world (see
+ * {@link TeamContentsSavedData}); the tracking state below is session-only.
+ * When {@link PantheonConfig#teamsEnabled} is off, every player
  * resolves to the single {@link TeamManager#GLOBAL_TEAM_NAME} team, which is
  * exactly the original one-pool-for-the-whole-server behavior.
  */
