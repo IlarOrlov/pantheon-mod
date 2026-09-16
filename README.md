@@ -1,3 +1,5 @@
+<p align="center"><img src="logo.png" width="256" alt="Pantheon logo"></p>
+
 # Pantheon
 
 A [Fabric](https://fabricmc.net/) mod for Minecraft that gives every player on the server **one shared inventory**. Storage and hotbar are always shared; armor and offhand can be too. Pick something up as one player, and it's instantly available to the rest of the party.
