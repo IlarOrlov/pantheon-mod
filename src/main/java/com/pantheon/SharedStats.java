@@ -9,7 +9,6 @@ import java.util.UUID;
 
 import net.minecraft.core.Holder;
 import net.minecraft.network.chat.Component;
-import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.effect.MobEffect;
@@ -55,10 +54,27 @@ public final class SharedStats {
 	private SharedStats() {
 	}
 
-	public static void tick(final MinecraftServer server) {
+	/**
+	 * Drops this player's tracked effect durations so the very next
+	 * {@link #tickEffects} doesn't mistake a fresh death-respawn - which
+	 * hands out a brand-new entity with no active effects at all, regardless
+	 * of what the old one had running - for a deliberate cure of whatever
+	 * was active before they died. With no "previous" entry left for their
+	 * UUID, the existing not-tracked-yet branch in {@link #tickEffects}
+	 * (identical to a fresh join) takes over instead, letting them silently
+	 * re-adopt the team's aggregate on the next tick rather than being
+	 * excluded from it. Called from {@link PantheonMod}'s
+	 * {@code ServerPlayerEvents.AFTER_RESPAWN} listener for an actual death
+	 * (not a dimension-change respawn, which does carry effects over).
+	 */
+	public static void onRespawn(final ServerPlayer player) {
+		TeamManager.teamOf(player).lastMemberEffectDurations.remove(player.getUUID());
+	}
+
+	public static void tick(final Map<Team, List<ServerPlayer>> onlineByTeam) {
 		PantheonConfig config = PantheonConfig.get();
 
-		for (Map.Entry<Team, List<ServerPlayer>> entry : TeamManager.groupOnlineByTeam(server).entrySet()) {
+		for (Map.Entry<Team, List<ServerPlayer>> entry : onlineByTeam.entrySet()) {
 			Team team = entry.getKey();
 			List<ServerPlayer> online = entry.getValue();
 
@@ -365,14 +381,22 @@ public final class SharedStats {
 		}
 
 		for (ServerPlayer player : online) {
-			team.lastSyncedExperienceLevel.put(player.getUUID(), team.sharedExperienceLevel);
-			team.lastSyncedExperienceProgress.put(player.getUUID(), team.sharedExperienceProgress);
 			if (player.experienceLevel != team.sharedExperienceLevel) {
 				player.setExperienceLevels(team.sharedExperienceLevel);
 			}
 			if (player.experienceProgress != team.sharedExperienceProgress) {
 				player.setExperiencePoints(Math.round(team.sharedExperienceProgress * player.getXpNeededForNextLevel()));
 			}
+			// Recorded from the player's own post-set state, not the target
+			// team.sharedExperience* values: setExperiencePoints rounds to a
+			// whole XP point, so its actual resulting experienceProgress is
+			// very rarely bit-identical to the exact float we asked for.
+			// Recording the target anyway would leave a small nonzero delta
+			// for every player, every tick, forever - even with nobody
+			// gaining or spending XP - since the "current vs previous" check
+			// above never contributes it to a real change.
+			team.lastSyncedExperienceLevel.put(player.getUUID(), player.experienceLevel);
+			team.lastSyncedExperienceProgress.put(player.getUUID(), player.experienceProgress);
 		}
 	}
 
@@ -468,10 +492,20 @@ public final class SharedStats {
 		}
 	}
 
-	/** Amplifier wins first (a stronger potion always takes priority); a longer remaining duration only breaks a tie on amplifier. */
+	/**
+	 * Amplifier wins first (a stronger potion always takes priority); a
+	 * longer remaining duration only breaks a tie on amplifier - with an
+	 * infinite duration (getDuration() == -1, e.g. from a beacon or
+	 * /effect ... infinite) always outranking any finite one, since a raw
+	 * numeric comparison would otherwise read that -1 sentinel as shorter
+	 * than everything instead of longer than everything.
+	 */
 	private static boolean isStrongerEffect(final MobEffectInstance a, final MobEffectInstance b) {
 		if (a.getAmplifier() != b.getAmplifier()) {
 			return a.getAmplifier() > b.getAmplifier();
+		}
+		if (a.isInfiniteDuration() != b.isInfiniteDuration()) {
+			return a.isInfiniteDuration();
 		}
 		return a.getDuration() > b.getDuration();
 	}

@@ -54,8 +54,14 @@ public abstract class SharedHungerWasteMixin {
 		Team team = TeamManager.teamOf(player);
 		Integer sharedFood = team.sharedFoodLevel();
 		Float sharedSaturation = team.sharedSaturationLevel();
+		// Vanilla's own FoodData#eat clamps saturation at the current food
+		// level, not a flat 20 - so "saturation pool already at its real
+		// cap" means sharedSaturation >= sharedFood, not sharedSaturation
+		// compared against this one item's own small saturation *modifier*
+		// (typically 0.1-1.2), which would be satisfied by almost any
+		// nonzero saturation the pool happens to have.
 		if (sharedFood != null && sharedFood >= MAX_FOOD_LEVEL
-			&& sharedSaturation != null && sharedSaturation >= self.saturation()
+			&& sharedSaturation != null && sharedSaturation >= sharedFood.floatValue()
 			&& player.getFoodData().getFoodLevel() >= MAX_FOOD_LEVEL) {
 			ci.cancel();
 		}

@@ -1,14 +1,19 @@
 package com.pantheon;
 
+import java.util.List;
+import java.util.Map;
+
 import com.pantheon.network.PantheonNetworking;
 
 import net.fabricmc.api.ModInitializer;
+import net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.gamerules.GameRules;
 
 import org.slf4j.Logger;
@@ -64,14 +69,30 @@ public class PantheonMod implements ModInitializer {
 		});
 		ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> HotbarOwnership.broadcast(server));
 
+		// alive=false is an actual death respawn (a fresh entity with no
+		// active effects); alive=true is a dimension-change respawn (e.g.
+		// leaving the End), which does carry effects over and needs none of
+		// this.
+		ServerPlayerEvents.AFTER_RESPAWN.register((oldPlayer, newPlayer, alive) -> {
+			if (!alive) {
+				SharedStats.onRespawn(newPlayer);
+			}
+		});
+
 		ServerTickEvents.END_SERVER_TICK.register(server -> {
 			this.tickCounter++;
 			enforceKeepInventory(server);
 			HotbarOwnership.enforceTwoHandMode(server);
-			HotbarOwnership.tick(server);
-			SharedStats.tick(server);
+			// Computed once and shared: HotbarOwnership.tick and SharedStats.tick
+			// both need "who's online, grouped by team" every single tick, and
+			// grouping is real work (a fresh map/lists, one teamOf() lookup per
+			// online player) - doing it twice, 20 times a second, for identical
+			// results is pure waste.
+			Map<Team, List<ServerPlayer>> onlineByTeam = TeamManager.groupOnlineByTeam(server);
+			HotbarOwnership.tick(onlineByTeam);
+			SharedStats.tick(onlineByTeam);
 			if (this.tickCounter % RESYNC_INTERVAL_TICKS == 0) {
-				HotbarOwnership.broadcast(server);
+				HotbarOwnership.broadcast(onlineByTeam);
 			}
 		});
 	}

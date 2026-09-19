@@ -9,7 +9,8 @@
 		"HotbarOwnershipCapMixin",
 		"HotbarRespawnMixin",
 		"HotbarSelectionCapMixin",
-		"SharedHungerWasteMixin"
+		"SharedHungerWasteMixin",
+		"UnsharedEquipmentDeathDropMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1
