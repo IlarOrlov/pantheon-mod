@@ -4,9 +4,12 @@ import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
+import net.minecraft.core.Holder;
 import net.minecraft.core.NonNullList;
+import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.item.ItemStack;
 
@@ -47,6 +50,19 @@ public final class Team {
 
 	// "Request the slot" ping cooldowns, keyed by requesting player.
 	public final Map<UUID, Long> lastPingTick = new HashMap<>();
+
+	// SharedStats effect tracking - see that class for what these mean.
+	final Map<UUID, Map<Holder<MobEffect>, Integer>> lastMemberEffectDurations = new HashMap<>();
+	final Map<Holder<MobEffect>, Set<UUID>> effectCureExclusions = new HashMap<>();
+
+	/** The shared hunger pool's current food level, or {@code null} if shared hunger has never synced (or is off). Package-visible fields stay {@link SharedStats}'s to write; this is the read-only view other packages (mixins) need. */
+	public Integer sharedFoodLevel() {
+		return this.sharedFood;
+	}
+
+	public Float sharedSaturationLevel() {
+		return this.sharedSaturation;
+	}
 
 	public Team(final String name) {
 		this.name = name;

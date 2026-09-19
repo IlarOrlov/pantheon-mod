@@ -10,6 +10,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import com.pantheon.HotbarOwnership;
+import com.pantheon.PantheonConfig;
 import com.pantheon.network.HotbarOwnersPayload;
 
 import net.minecraft.network.protocol.game.ServerboundSetCarriedItemPacket;
@@ -33,6 +34,11 @@ public abstract class HotbarSelectionCapMixin {
 	private void pantheon$blockLockedSelect(final ServerboundSetCarriedItemPacket packet, final CallbackInfo ci) {
 		int slot = packet.getSlot();
 		if (slot < 0 || slot >= HotbarOwnersPayload.SLOT_COUNT) {
+			return;
+		}
+
+		if (PantheonConfig.get().twoHandSlotMode && slot != 0) {
+			ci.cancel();
 			return;
 		}
 

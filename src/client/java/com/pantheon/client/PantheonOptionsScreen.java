@@ -55,14 +55,26 @@ public final class PantheonOptionsScreen extends Screen {
 
 		content.addChild(spacer());
 		content.addChild(sectionLabel("Hotbar ownership"));
-		content.addChild(toggleRow("Item bar slot ownership (9 players maximum)",
-			this.working.enableHotbarOwnership, v -> this.working.enableHotbarOwnership = v));
+		CycleButton<Boolean> ownershipToggle = toggleRow("Item bar slot ownership (9 players maximum)",
+			this.working.enableHotbarOwnership, v -> this.working.enableHotbarOwnership = v);
+		ownershipToggle.active = !this.working.twoHandSlotMode;
+		content.addChild(ownershipToggle);
+		content.addChild(toggleRow("Two-hand mode: only one hotbar slot + off-hand selectable",
+			this.working.twoHandSlotMode, v -> {
+				this.working.twoHandSlotMode = v;
+				if (v) {
+					this.working.enableHotbarOwnership = false;
+					ownershipToggle.setValue(false);
+				}
+				ownershipToggle.active = !v;
+			}));
 
 		content.addChild(spacer());
 		content.addChild(sectionLabel("Shared vitals"));
 		content.addChild(toggleRow("Share health", this.working.syncHealth, v -> this.working.syncHealth = v));
 		content.addChild(toggleRow("Share hunger", this.working.syncHunger, v -> this.working.syncHunger = v));
 		content.addChild(toggleRow("Share XP", this.working.syncExperience, v -> this.working.syncExperience = v));
+		content.addChild(toggleRow("Share potion effects", this.working.syncEffects, v -> this.working.syncEffects = v));
 
 		content.addChild(spacer());
 		content.addChild(sectionLabel("Teams"));

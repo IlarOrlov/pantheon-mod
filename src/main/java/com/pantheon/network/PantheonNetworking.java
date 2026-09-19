@@ -1,5 +1,6 @@
 package com.pantheon.network;
 
+import com.pantheon.EquipmentSharingTransfer;
 import com.pantheon.FunnyMessages;
 import com.pantheon.HotbarOwnership;
 import com.pantheon.PantheonConfig;
@@ -10,9 +11,12 @@ import com.pantheon.TeamManager;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.game.ClientboundSoundPacket;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.players.NameAndId;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
 
 import java.util.List;
 import java.util.UUID;
@@ -76,7 +80,23 @@ public final class PantheonNetworking {
 		}
 
 		owner.sendOverlayMessage(FunnyMessages.randomSlotRequest(requester.getGameProfile().name()));
+		playPingSound(owner);
 		requester.sendOverlayMessage(Component.literal("Poked " + owner.getGameProfile().name() + " about that slot."));
+	}
+
+	/**
+	 * A short "ding" only the pinged owner hears, sent as a targeted sound
+	 * packet (not {@code Level.playSound}, which would let nearby bystanders
+	 * hear a random ding meant for someone else). Built from a vanilla note
+	 * block sound rather than any real-world recording - the mod can't ship
+	 * copyrighted audio.
+	 */
+	private static void playPingSound(final ServerPlayer owner) {
+		owner.connection.send(new ClientboundSoundPacket(
+			SoundEvents.NOTE_BLOCK_BELL, SoundSource.PLAYERS,
+			owner.getX(), owner.getY(), owner.getZ(),
+			1.0f, 2.0f, owner.level().getRandom().nextLong()
+		));
 	}
 
 	private static void handleUpdateConfig(final MinecraftServer server, final ServerPlayer player, final UpdateConfigPayload payload) {
@@ -85,7 +105,10 @@ public final class PantheonNetworking {
 			return;
 		}
 
-		PantheonConfig updated = PantheonConfig.applyAndSave(payload.toConfig());
+		PantheonConfig oldConfig = PantheonConfig.get();
+		PantheonConfig newConfig = payload.toConfig();
+		EquipmentSharingTransfer.handle(server, oldConfig, newConfig);
+		PantheonConfig updated = PantheonConfig.applyAndSave(newConfig);
 		PantheonMod.LOGGER.info("Pantheon config changed by {}: {}", player.getGameProfile().name(), updated);
 
 		SyncConfigPayload syncPayload = SyncConfigPayload.fromConfig(updated);

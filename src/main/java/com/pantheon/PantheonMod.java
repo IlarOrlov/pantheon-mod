@@ -8,6 +8,7 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 
 import net.minecraft.resources.Identifier;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.level.gamerules.GameRules;
 
 import org.slf4j.Logger;
@@ -58,6 +59,8 @@ public class PantheonMod implements ModInitializer {
 
 		ServerTickEvents.END_SERVER_TICK.register(server -> {
 			this.tickCounter++;
+			enforceKeepInventory(server);
+			HotbarOwnership.enforceTwoHandMode(server);
 			HotbarOwnership.tick(server);
 			SharedStats.tick(server);
 			if (this.tickCounter % RESYNC_INTERVAL_TICKS == 0) {
@@ -68,5 +71,24 @@ public class PantheonMod implements ModInitializer {
 
 	public static Identifier id(final String path) {
 		return Identifier.fromNamespaceAndPath(MOD_ID, path);
+	}
+
+	/**
+	 * {@code keepInventory} is forced on at startup, but nothing stops a later
+	 * {@code /gamerule keepInventory false} (by an op who forgot why it was on,
+	 * or just doesn't know) from turning it back off mid-session. With it off,
+	 * a shared-health-pool death would let vanilla's own per-entity drop run
+	 * for every dying teammate against the *same* shared item list - dropping
+	 * every item once per teammate instead of once for the whole event - on
+	 * top of {@link SharedStats#tick}'s own explicit one-time drop, duplicating
+	 * the team's entire inventory. Reasserting it every tick, before any death
+	 * handling this tick can happen, closes that off without having to hook
+	 * the gamerule command itself.
+	 */
+	private static void enforceKeepInventory(final MinecraftServer server) {
+		if (!Boolean.TRUE.equals(server.getGameRules().get(GameRules.KEEP_INVENTORY))) {
+			server.getGameRules().set(GameRules.KEEP_INVENTORY, Boolean.TRUE, server);
+			LOGGER.warn("[PantheonMod] keepInventory was turned off - Pantheon requires it, forcing it back on.");
+		}
 	}
 }

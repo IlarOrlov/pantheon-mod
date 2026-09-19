@@ -155,10 +155,20 @@ public class PantheonModClient implements ClientModInitializer {
 		ClientPlayNetworking.send(UpdateConfigPayload.fromConfig(config));
 	}
 
-	/** Whether {@code slot} is currently locked to some other online player (not us, not unowned). */
+	/**
+	 * Whether {@code slot} is currently locked to some other online player
+	 * (not us, not unowned) - or, in two-hand mode, simply not slot 0, since
+	 * every slot but the one selectable main-hand slot is effectively "locked"
+	 * to nobody being allowed to select it at all. Reusing this single check
+	 * lets the scroll-skip and number-key mixins enforce two-hand mode for
+	 * free, with no changes of their own.
+	 */
 	public static boolean isLockedToSomeoneElse(final int slot) {
 		if (slot < 0 || slot >= hotbarOwners.size()) {
 			return false;
+		}
+		if (lastKnownConfig.twoHandSlotMode) {
+			return slot != 0;
 		}
 		Minecraft minecraft = Minecraft.getInstance();
 		if (minecraft.player == null) {

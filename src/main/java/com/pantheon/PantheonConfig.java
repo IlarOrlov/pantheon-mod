@@ -38,13 +38,39 @@ public final class PantheonConfig {
 	public boolean syncHealth = false;
 	public boolean syncHunger = false;
 	public boolean syncExperience = false;
+	/** When on, active potion/status effects (from drinking, splash/lingering potions, beacons, ...) propagate to the rest of the online team. */
+	public boolean syncEffects = false;
 	/** When on, sharing is scoped per-team ({@code /pantheon team}) instead of one pool for the whole server. */
 	public boolean teamsEnabled = true;
 	/** When on, the propagated-death jokes can also draw from a cruder, swear-heavier phrase pool. Off by default. */
 	public boolean crudeHumor = false;
+	/**
+	 * When on, only a single hotbar slot (index 0, the "main hand") can ever be
+	 * selected - together with the always-available off-hand slot, that's the
+	 * "two hands" the mode is named for. Mutually exclusive with
+	 * {@link #enableHotbarOwnership}: per-slot ownership has nothing to lock
+	 * with only one selectable slot, so turning this on always forces that off
+	 * (see {@link #normalize()}).
+	 */
+	public boolean twoHandSlotMode = false;
 
 	public static PantheonConfig get() {
 		return instance;
+	}
+
+	/**
+	 * Enforces invariants between fields that can't both be true at once.
+	 * Two-hand-slot mode leaves exactly one selectable hotbar slot, so
+	 * per-slot ownership - which exists to arbitrate *multiple* selectable
+	 * slots between teammates - is meaningless with it on; always winning
+	 * that conflict in favor of two-hand mode (rather than rejecting the
+	 * change outright) keeps every call site that flips one flag from also
+	 * having to know about the other.
+	 */
+	public void normalize() {
+		if (this.twoHandSlotMode) {
+			this.enableHotbarOwnership = false;
+		}
 	}
 
 	public boolean isEquipmentSlotShared(final EquipmentSlot slot) {
@@ -61,6 +87,7 @@ public final class PantheonConfig {
 			try (Reader reader = Files.newBufferedReader(configPath, StandardCharsets.UTF_8)) {
 				PantheonConfig loaded = GSON.fromJson(reader, PantheonConfig.class);
 				if (loaded != null) {
+					loaded.normalize();
 					instance = loaded;
 					PantheonMod.LOGGER.info("[PantheonConfig] Loaded config/pantheon.json: {}", describe(instance));
 				} else {
@@ -102,6 +129,7 @@ public final class PantheonConfig {
 
 	/** Replaces the live config, persists it, and returns it so callers can broadcast it. */
 	public static synchronized PantheonConfig applyAndSave(final PantheonConfig updated) {
+		updated.normalize();
 		instance = updated;
 		save();
 		return instance;
@@ -115,8 +143,10 @@ public final class PantheonConfig {
 		copy.syncHealth = this.syncHealth;
 		copy.syncHunger = this.syncHunger;
 		copy.syncExperience = this.syncExperience;
+		copy.syncEffects = this.syncEffects;
 		copy.teamsEnabled = this.teamsEnabled;
 		copy.crudeHumor = this.crudeHumor;
+		copy.twoHandSlotMode = this.twoHandSlotMode;
 		return copy;
 	}
 
@@ -127,7 +157,9 @@ public final class PantheonConfig {
 			+ ", syncHealth=" + config.syncHealth
 			+ ", syncHunger=" + config.syncHunger
 			+ ", syncExperience=" + config.syncExperience
+			+ ", syncEffects=" + config.syncEffects
 			+ ", teamsEnabled=" + config.teamsEnabled
-			+ ", crudeHumor=" + config.crudeHumor;
+			+ ", crudeHumor=" + config.crudeHumor
+			+ ", twoHandSlotMode=" + config.twoHandSlotMode;
 	}
 }

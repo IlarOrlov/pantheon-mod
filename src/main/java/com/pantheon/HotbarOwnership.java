@@ -158,6 +158,26 @@ public final class HotbarOwnership {
 		ServerPlayNetworking.send(player, new ForceHotbarSlotPayload(finalSlot));
 	}
 
+	/**
+	 * Two-hand mode leaves exactly one selectable hotbar slot (index 0); a
+	 * player can still show up with a different slot selected - loaded from
+	 * their own save data from before the mode was turned on, or a stale
+	 * client-predicted selection - so force it back every tick rather than
+	 * only at the moments {@link com.pantheon.mixin.HotbarSelectionCapMixin}
+	 * happens to see a selection packet.
+	 */
+	public static void enforceTwoHandMode(final MinecraftServer server) {
+		if (!PantheonConfig.get().twoHandSlotMode) {
+			return;
+		}
+		for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+			if (player.getInventory().getSelectedSlot() != 0) {
+				player.getInventory().setSelectedSlot(0);
+				ServerPlayNetworking.send(player, new ForceHotbarSlotPayload(0));
+			}
+		}
+	}
+
 	/** Recomputes ownership per online team and, only for teams where it changed since the last check, pushes it to that team's clients. */
 	public static void tick(final MinecraftServer server) {
 		for (Map.Entry<Team, List<ServerPlayer>> entry : TeamManager.groupOnlineByTeam(server).entrySet()) {

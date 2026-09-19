@@ -27,7 +27,7 @@ public final class PantheonCommands {
 	}
 
 	private static final SuggestionProvider<CommandSourceStack> SETTING_NAMES = (context, builder) -> {
-		for (String name : new String[] {"syncArmor", "syncOffhand", "enableHotbarOwnership", "syncHealth", "syncHunger", "syncExperience", "teamsEnabled", "crudeHumor"}) {
+		for (String name : new String[] {"syncArmor", "syncOffhand", "enableHotbarOwnership", "syncHealth", "syncHunger", "syncExperience", "syncEffects", "teamsEnabled", "crudeHumor", "twoHandSlotMode"}) {
 			builder.suggest(name);
 		}
 		return builder.buildFuture();
@@ -92,8 +92,10 @@ public final class PantheonCommands {
 				+ ", syncHealth=" + config.syncHealth
 				+ ", syncHunger=" + config.syncHunger
 				+ ", syncExperience=" + config.syncExperience
+				+ ", syncEffects=" + config.syncEffects
 				+ ", teamsEnabled=" + config.teamsEnabled
 				+ ", crudeHumor=" + config.crudeHumor
+				+ ", twoHandSlotMode=" + config.twoHandSlotMode
 		), false);
 		return 1;
 	}
@@ -112,8 +114,10 @@ public final class PantheonCommands {
 				case "syncHealth" -> config.syncHealth = Boolean.parseBoolean(value);
 				case "syncHunger" -> config.syncHunger = Boolean.parseBoolean(value);
 				case "syncExperience" -> config.syncExperience = Boolean.parseBoolean(value);
+				case "syncEffects" -> config.syncEffects = Boolean.parseBoolean(value);
 				case "teamsEnabled" -> config.teamsEnabled = Boolean.parseBoolean(value);
 				case "crudeHumor" -> config.crudeHumor = Boolean.parseBoolean(value);
+				case "twoHandSlotMode" -> config.twoHandSlotMode = Boolean.parseBoolean(value);
 				default -> {
 					source.sendFailure(Component.literal("Unknown setting: " + setting));
 					return 0;
@@ -125,6 +129,7 @@ public final class PantheonCommands {
 		}
 
 		MinecraftServer server = source.getServer();
+		EquipmentSharingTransfer.handle(server, PantheonConfig.get(), config);
 		PantheonConfig updated = PantheonConfig.applyAndSave(config);
 
 		SyncConfigPayload syncPayload = SyncConfigPayload.fromConfig(updated);
@@ -137,8 +142,43 @@ public final class PantheonCommands {
 		TeamManager.reassignAllOnline(server);
 		HotbarOwnership.broadcast(server);
 
-		source.sendSuccess(() -> Component.literal(setting + " = " + value), true);
+		boolean requested = Boolean.parseBoolean(value);
+		boolean actual = currentValue(updated, setting);
+		source.sendSuccess(() -> Component.literal(setting + " = " + actual), true);
+		if (actual != requested) {
+			// normalize() overrode what was actually asked for - most likely
+			// the twoHandSlotMode/enableHotbarOwnership conflict, since that's
+			// the only pair of fields it currently reconciles. Say so instead
+			// of letting the success message above quietly lie about it.
+			source.sendSystemMessage(Component.literal(
+				setting + " couldn't be set to " + requested + " - twoHandSlotMode and enableHotbarOwnership can't both be on at once."
+			).withStyle(ChatFormatting.YELLOW));
+		} else if ("twoHandSlotMode".equals(setting) && updated.twoHandSlotMode && !updated.enableHotbarOwnership) {
+			// twoHandSlotMode itself was applied as requested, but it also
+			// force-disabled enableHotbarOwnership as a side effect - worth
+			// calling out even though it's not what the line above checks for.
+			source.sendSystemMessage(Component.literal(
+				"Note: enableHotbarOwnership was also turned off - it can't be on at the same time as twoHandSlotMode."
+			).withStyle(ChatFormatting.YELLOW));
+		}
 		return 1;
+	}
+
+	/** The actual current value of one of {@link #SETTING_NAMES}' boolean settings - used to report what a {@code /pantheon config} change truly resulted in, since {@link PantheonConfig#normalize()} can override what was directly requested. */
+	private static boolean currentValue(final PantheonConfig config, final String setting) {
+		return switch (setting) {
+			case "syncArmor" -> config.syncArmor;
+			case "syncOffhand" -> config.syncOffhand;
+			case "enableHotbarOwnership" -> config.enableHotbarOwnership;
+			case "syncHealth" -> config.syncHealth;
+			case "syncHunger" -> config.syncHunger;
+			case "syncExperience" -> config.syncExperience;
+			case "syncEffects" -> config.syncEffects;
+			case "teamsEnabled" -> config.teamsEnabled;
+			case "crudeHumor" -> config.crudeHumor;
+			case "twoHandSlotMode" -> config.twoHandSlotMode;
+			default -> false;
+		};
 	}
 
 	/** Team commands still work while {@code teamsEnabled} is off (so they can be set up in advance), but nothing they do actually affects sharing until it's on - make that obvious instead of a silent no-op. */

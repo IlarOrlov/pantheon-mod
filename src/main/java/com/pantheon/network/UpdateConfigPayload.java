@@ -22,8 +22,10 @@ public record UpdateConfigPayload(
 	boolean syncHealth,
 	boolean syncHunger,
 	boolean syncExperience,
+	boolean syncEffects,
 	boolean teamsEnabled,
-	boolean crudeHumor
+	boolean crudeHumor,
+	boolean twoHandSlotMode
 ) implements CustomPacketPayload {
 	public static final CustomPacketPayload.Type<UpdateConfigPayload> TYPE = new CustomPacketPayload.Type<>(PantheonMod.id("update_config"));
 
@@ -34,8 +36,10 @@ public record UpdateConfigPayload(
 		ByteBufCodecs.BOOL, UpdateConfigPayload::syncHealth,
 		ByteBufCodecs.BOOL, UpdateConfigPayload::syncHunger,
 		ByteBufCodecs.BOOL, UpdateConfigPayload::syncExperience,
+		ByteBufCodecs.BOOL, UpdateConfigPayload::syncEffects,
 		ByteBufCodecs.BOOL, UpdateConfigPayload::teamsEnabled,
 		ByteBufCodecs.BOOL, UpdateConfigPayload::crudeHumor,
+		ByteBufCodecs.BOOL, UpdateConfigPayload::twoHandSlotMode,
 		UpdateConfigPayload::new
 	);
 
@@ -47,8 +51,10 @@ public record UpdateConfigPayload(
 			config.syncHealth,
 			config.syncHunger,
 			config.syncExperience,
+			config.syncEffects,
 			config.teamsEnabled,
-			config.crudeHumor
+			config.crudeHumor,
+			config.twoHandSlotMode
 		);
 	}
 
@@ -60,8 +66,10 @@ public record UpdateConfigPayload(
 		config.syncHealth = this.syncHealth;
 		config.syncHunger = this.syncHunger;
 		config.syncExperience = this.syncExperience;
+		config.syncEffects = this.syncEffects;
 		config.teamsEnabled = this.teamsEnabled;
 		config.crudeHumor = this.crudeHumor;
+		config.twoHandSlotMode = this.twoHandSlotMode;
 		return config;
 	}
 

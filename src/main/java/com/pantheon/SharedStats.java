@@ -1,15 +1,20 @@
 package com.pantheon;
 
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+import net.minecraft.core.Holder;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.effect.MobEffect;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.item.ItemStack;
 
 /**
@@ -44,6 +49,9 @@ import net.minecraft.world.item.ItemStack;
  * it survive a death that's supposed to actually end the run.
  */
 public final class SharedStats {
+	/** A member's remaining duration on an effect has to be above this to count a disappearance as a deliberate cure rather than it just running out. */
+	private static final int CURE_DETECTION_THRESHOLD_TICKS = 3;
+
 	private SharedStats() {
 	}
 
@@ -78,6 +86,13 @@ public final class SharedStats {
 				team.sharedExperienceProgress = null;
 				team.lastSyncedExperienceLevel.clear();
 				team.lastSyncedExperienceProgress.clear();
+			}
+
+			if (config.syncEffects) {
+				tickEffects(team, online);
+			} else if (!team.lastMemberEffectDurations.isEmpty() || !team.effectCureExclusions.isEmpty()) {
+				team.lastMemberEffectDurations.clear();
+				team.effectCureExclusions.clear();
 			}
 		}
 	}
@@ -200,7 +215,17 @@ public final class SharedStats {
 		}
 	}
 
-	/** Drops the team's shared inventory contents once (not per dying player, to avoid duplicating every item) and clears it. */
+	/**
+	 * Drops the team's shared inventory contents once (not per dying player,
+	 * to avoid duplicating every item) and clears it - including any currently
+	 * shared armor/offhand. Equipment can't rely on vanilla's own
+	 * drop-on-death here even setting keepInventory aside: {@code com.pantheon.mixin.EquipmentSharingMixin}
+	 * only redirects {@code PlayerEquipment.get/set}, so vanilla's
+	 * {@code EntityEquipment.dropAll} - which reads its own private backing
+	 * map directly, not through the overridden accessors - would drop whatever
+	 * stale, orphaned local items that map holds instead of the actual shared
+	 * ones sitting in {@link Team#equipment}.
+	 */
 	private static void dropSharedInventoryOnce(final Team team, final ServerPlayer anchor) {
 		ServerLevel level = (ServerLevel) anchor.level();
 		for (int i = 0; i < team.items.size(); i++) {
@@ -210,8 +235,30 @@ public final class SharedStats {
 				team.items.set(i, ItemStack.EMPTY);
 			}
 		}
+		PantheonConfig config = PantheonConfig.get();
+		for (EquipmentSlot slot : EquipmentSlot.values()) {
+			if (!config.isEquipmentSlotShared(slot)) {
+				continue;
+			}
+			ItemStack stack = team.equipment.get(slot);
+			if (stack != null && !stack.isEmpty()) {
+				anchor.spawnAtLocation(level, stack);
+				team.equipment.put(slot, ItemStack.EMPTY);
+			}
+		}
 	}
 
+	/**
+	 * Two players eating (or a player eating while another simultaneously
+	 * drains from exhaustion) in the very same tick both count as "changed"
+	 * here - picking whichever happens to be last in iteration order, as a
+	 * single flat assignment would, arbitrarily throws the other one away.
+	 * Preferring the higher food level (tying on saturation) instead means a
+	 * genuine eat is never silently discarded just because someone else's
+	 * value moved the same tick; a natural drain that loses this tie isn't
+	 * lost for good, since it reasserts itself again as soon as it next
+	 * differs from whatever the pool settles on.
+	 */
 	private static void tickHunger(final Team team, final List<ServerPlayer> online) {
 		if (online.isEmpty()) {
 			return;
@@ -219,16 +266,23 @@ public final class SharedStats {
 		team.lastSyncedFood.keySet().retainAll(uuids(online));
 		team.lastSyncedSaturation.keySet().retainAll(uuids(online));
 
+		Integer bestFood = null;
+		Float bestSaturation = null;
 		for (ServerPlayer player : online) {
 			Integer previousFood = team.lastSyncedFood.get(player.getUUID());
 			Float previousSaturation = team.lastSyncedSaturation.get(player.getUUID());
 			int food = player.getFoodData().getFoodLevel();
 			float saturation = player.getFoodData().getSaturationLevel();
-			if ((previousFood != null && previousFood.intValue() != food)
-				|| (previousSaturation != null && previousSaturation.floatValue() != saturation)) {
-				team.sharedFood = food;
-				team.sharedSaturation = saturation;
+			boolean changed = (previousFood != null && previousFood.intValue() != food)
+				|| (previousSaturation != null && previousSaturation.floatValue() != saturation);
+			if (changed && (bestFood == null || food > bestFood || (food == bestFood && saturation > bestSaturation))) {
+				bestFood = food;
+				bestSaturation = saturation;
 			}
+		}
+		if (bestFood != null) {
+			team.sharedFood = bestFood;
+			team.sharedSaturation = bestSaturation;
 		}
 		if (team.sharedFood == null) {
 			team.sharedFood = online.get(0).getFoodData().getFoodLevel();
@@ -253,6 +307,19 @@ public final class SharedStats {
 	 * (same approach as food level/saturation) rather than converting through
 	 * a combined "total XP" number, so a level-up from one teammate's own kill
 	 * or mining shows up for the rest of the team exactly as it happened.
+	 *
+	 * <p>Unlike hunger, experience has a real "spend" action (an anvil,
+	 * villager trades, ...) that must never be silently undone - so when a
+	 * decrease and an increase both show up in the same tick (someone pays an
+	 * anvil cost the very tick a teammate picks up an XP orb), the decrease
+	 * always wins regardless of size: reversing that would hand back spent
+	 * levels for free, repeatably, which is exactly the kind of thing a
+	 * player could deliberately time to happen. A delayed-by-one-tick gain
+	 * has no such exploit - it's just briefly overwritten and, if it was a
+	 * real standalone gain, shows up again as soon as it next differs from
+	 * whatever the pool settles on. Ties within the same direction still
+	 * prefer the more extreme value (most spent / most gained), same
+	 * reasoning as {@link #tickHunger}.
 	 */
 	private static void tickExperience(final Team team, final List<ServerPlayer> online) {
 		if (online.isEmpty()) {
@@ -261,16 +328,42 @@ public final class SharedStats {
 		team.lastSyncedExperienceLevel.keySet().retainAll(uuids(online));
 		team.lastSyncedExperienceProgress.keySet().retainAll(uuids(online));
 
+		Integer bestLevel = null;
+		Float bestProgress = null;
+		Boolean bestIsDecrease = null;
 		for (ServerPlayer player : online) {
 			Integer previousLevel = team.lastSyncedExperienceLevel.get(player.getUUID());
 			Float previousProgress = team.lastSyncedExperienceProgress.get(player.getUUID());
 			int level = player.experienceLevel;
 			float progress = player.experienceProgress;
-			if ((previousLevel != null && previousLevel.intValue() != level)
-				|| (previousProgress != null && previousProgress.floatValue() != progress)) {
-				team.sharedExperienceLevel = level;
-				team.sharedExperienceProgress = progress;
+			boolean changed = (previousLevel != null && previousLevel.intValue() != level)
+				|| (previousProgress != null && previousProgress.floatValue() != progress);
+			if (!changed) {
+				continue;
 			}
+			boolean isDecrease = previousLevel != null
+				&& (level < previousLevel || (level == previousLevel && progress < previousProgress));
+
+			boolean candidateWins;
+			if (bestLevel == null) {
+				candidateWins = true;
+			} else if (isDecrease != bestIsDecrease) {
+				candidateWins = isDecrease;
+			} else if (isDecrease) {
+				candidateWins = level < bestLevel || (level == bestLevel && progress < bestProgress);
+			} else {
+				candidateWins = level > bestLevel || (level == bestLevel && progress > bestProgress);
+			}
+
+			if (candidateWins) {
+				bestLevel = level;
+				bestProgress = progress;
+				bestIsDecrease = isDecrease;
+			}
+		}
+		if (bestLevel != null) {
+			team.sharedExperienceLevel = bestLevel;
+			team.sharedExperienceProgress = bestProgress;
 		}
 		if (team.sharedExperienceLevel == null) {
 			team.sharedExperienceLevel = online.get(0).experienceLevel;
@@ -287,6 +380,106 @@ public final class SharedStats {
 				player.setExperiencePoints(Math.round(team.sharedExperienceProgress * player.getXpNeededForNextLevel()));
 			}
 		}
+	}
+
+	/**
+	 * Propagates active potion/status effects (from drinking, splash/lingering
+	 * potions, beacons, ...) to the rest of the online team, so the whole team
+	 * benefits (or suffers) from whatever any one member picks up. Unlike
+	 * health/hunger/XP there's no single scalar to converge on - each effect
+	 * type is tracked independently, taking whichever online member currently
+	 * has the strongest instance (highest amplifier, then longest remaining
+	 * duration) as that effect's "source of truth" for the team this tick, and
+	 * handing a copy of it to every other member who doesn't already have an
+	 * equal-or-stronger one.
+	 *
+	 * <p>Deliberately asymmetric for removal: if a member cures a shared
+	 * effect early (milk, honey, etc.) while teammates still have it running,
+	 * they're recorded in {@link Team#effectCureExclusions} and skipped by
+	 * future propagation of that same effect - otherwise the very next tick
+	 * would just hand it right back to them, since teammates still show it as
+	 * active. That exclusion only lasts until the effect has fully run its
+	 * course for the whole team (nobody has it anymore), at which point the
+	 * next fresh application of it starts propagating again for everyone.
+	 *
+	 * <p>Instantaneous effects (instant health/harm) aren't handled here -
+	 * they apply and expire within the same tick they're added, almost always
+	 * before this poll ever runs, so there's nothing left to observe by the
+	 * time it does.
+	 */
+	private static void tickEffects(final Team team, final List<ServerPlayer> online) {
+		if (online.isEmpty()) {
+			return;
+		}
+		team.lastMemberEffectDurations.keySet().retainAll(uuids(online));
+
+		Map<Holder<MobEffect>, MobEffectInstance> aggregate = new HashMap<>();
+		for (ServerPlayer player : online) {
+			for (MobEffectInstance instance : player.getActiveEffectsMap().values()) {
+				MobEffectInstance current = aggregate.get(instance.getEffect());
+				if (current == null || isStrongerEffect(instance, current)) {
+					aggregate.put(instance.getEffect(), instance);
+				}
+			}
+		}
+
+		for (ServerPlayer player : online) {
+			Map<Holder<MobEffect>, Integer> previous = team.lastMemberEffectDurations.get(player.getUUID());
+			if (previous == null) {
+				continue;
+			}
+			Map<Holder<MobEffect>, MobEffectInstance> currentEffects = player.getActiveEffectsMap();
+			for (Map.Entry<Holder<MobEffect>, Integer> entry : previous.entrySet()) {
+				Holder<MobEffect> effect = entry.getKey();
+				if (currentEffects.containsKey(effect)) {
+					continue;
+				}
+				// Had a meaningful amount of time left last tick, but it's gone
+				// now even though the team aggregate still has it - that's a
+				// deliberate cure (milk, etc.), not it just running out.
+				if (entry.getValue() > CURE_DETECTION_THRESHOLD_TICKS && aggregate.containsKey(effect)) {
+					team.effectCureExclusions.computeIfAbsent(effect, e -> new HashSet<>()).add(player.getUUID());
+				}
+			}
+		}
+		// An effect nobody on the team has anymore resets its exclusions -
+		// the next time it's applied fresh, everyone's eligible again.
+		team.effectCureExclusions.keySet().retainAll(aggregate.keySet());
+
+		for (Map.Entry<Holder<MobEffect>, MobEffectInstance> entry : aggregate.entrySet()) {
+			Holder<MobEffect> effect = entry.getKey();
+			MobEffectInstance best = entry.getValue();
+			Set<UUID> excluded = team.effectCureExclusions.get(effect);
+			for (ServerPlayer player : online) {
+				if (excluded != null && excluded.contains(player.getUUID())) {
+					continue;
+				}
+				MobEffectInstance existing = player.getActiveEffectsMap().get(effect);
+				if (existing != null && !isStrongerEffect(best, existing)) {
+					continue;
+				}
+				if (!player.canBeAffected(best)) {
+					continue;
+				}
+				player.addEffect(new MobEffectInstance(best));
+			}
+		}
+
+		for (ServerPlayer player : online) {
+			Map<Holder<MobEffect>, Integer> snapshot = new HashMap<>();
+			for (Map.Entry<Holder<MobEffect>, MobEffectInstance> entry : player.getActiveEffectsMap().entrySet()) {
+				snapshot.put(entry.getKey(), entry.getValue().getDuration());
+			}
+			team.lastMemberEffectDurations.put(player.getUUID(), snapshot);
+		}
+	}
+
+	/** Amplifier wins first (a stronger potion always takes priority); a longer remaining duration only breaks a tie on amplifier. */
+	private static boolean isStrongerEffect(final MobEffectInstance a, final MobEffectInstance b) {
+		if (a.getAmplifier() != b.getAmplifier()) {
+			return a.getAmplifier() > b.getAmplifier();
+		}
+		return a.getDuration() > b.getDuration();
 	}
 
 	private static Set<UUID> uuids(final List<ServerPlayer> online) {
