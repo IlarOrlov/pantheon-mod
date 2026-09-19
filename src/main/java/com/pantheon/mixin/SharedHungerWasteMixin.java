@@ -29,6 +29,17 @@ import net.minecraft.world.level.Level;
  * for no reason. {@link net.minecraft.world.food.FoodProperties#canAlwaysEat()}
  * foods (golden apples, etc.) are deliberately exempt, same as vanilla exempts
  * them from the "already full" gate in the first place.
+ *
+ * <p>{@code team.sharedFoodLevel()} is only that fresh as of the *last*
+ * {@code SharedStats.tick} (once per server tick, at {@code END_SERVER_TICK}
+ * - after this tick's own entity ticking, including exhaustion drain, already
+ * ran) - so it can still read "full" here even when this player's own real,
+ * current hunger has since dropped below max earlier in the very same tick.
+ * Requiring the player's own live food level to *also* read full before
+ * cancelling avoids that stale-snapshot false positive, at the cost of only
+ * closing the narrower two-players-finish-eating-in-the-same-tick race this
+ * exists for, not every possible staleness window - a reasonable trade for
+ * what's already a rare edge case.
  */
 @Mixin(FoodProperties.class)
 public abstract class SharedHungerWasteMixin {
@@ -44,7 +55,8 @@ public abstract class SharedHungerWasteMixin {
 		Integer sharedFood = team.sharedFoodLevel();
 		Float sharedSaturation = team.sharedSaturationLevel();
 		if (sharedFood != null && sharedFood >= MAX_FOOD_LEVEL
-			&& sharedSaturation != null && sharedSaturation >= self.saturation()) {
+			&& sharedSaturation != null && sharedSaturation >= self.saturation()
+			&& player.getFoodData().getFoodLevel() >= MAX_FOOD_LEVEL) {
 			ci.cancel();
 		}
 	}

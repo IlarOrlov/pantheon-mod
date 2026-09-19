@@ -39,6 +39,13 @@ public class PantheonMod implements ModInitializer {
 			server.getGameRules().set(GameRules.KEEP_INVENTORY, Boolean.TRUE, server);
 		});
 
+		// Reasserted at the *start* of every tick too, not just the end (see
+		// enforceKeepInventory) - narrows, though doesn't fully close, the
+		// window between an op flipping the gamerule mid-tick and this mod
+		// noticing, since entity ticking (where an ordinary death could run
+		// against it) happens between the two.
+		ServerTickEvents.START_SERVER_TICK.register(PantheonMod::enforceKeepInventory);
+
 		// Shared items live in the world's saved data rather than any one player's
 		// file - make sure they go out with every world save (autosave, pause, stop).
 		ServerLifecycleEvents.BEFORE_SAVE.register((server, flush, force) -> TeamManager.markDirty(server));
@@ -81,9 +88,19 @@ public class PantheonMod implements ModInitializer {
 	 * for every dying teammate against the *same* shared item list - dropping
 	 * every item once per teammate instead of once for the whole event - on
 	 * top of {@link SharedStats#tick}'s own explicit one-time drop, duplicating
-	 * the team's entire inventory. Reasserting it every tick, before any death
-	 * handling this tick can happen, closes that off without having to hook
-	 * the gamerule command itself.
+	 * the team's entire inventory.
+	 *
+	 * <p>Called at both the start and end of every tick (see the two
+	 * {@code ServerTickEvents} registrations in {@link #onInitialize}), which
+	 * reliably closes that specific duplication case: nothing else runs
+	 * between this and {@link SharedStats#tick} within the same
+	 * {@code END_SERVER_TICK} handler, so a shared-pool death can never see
+	 * the gamerule off. It narrows, but can't fully close, the much rarer
+	 * case of an ordinary (non-pool) death from normal combat landing in the
+	 * exact same tick as the gamerule being flipped, before either of these
+	 * two calls has run again - closing that completely would mean
+	 * intercepting the {@code /gamerule} command itself, which felt like more
+	 * surface area than this edge case warrants.
 	 */
 	private static void enforceKeepInventory(final MinecraftServer server) {
 		if (!Boolean.TRUE.equals(server.getGameRules().get(GameRules.KEEP_INVENTORY))) {

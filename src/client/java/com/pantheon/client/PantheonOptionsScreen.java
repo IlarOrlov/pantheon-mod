@@ -59,7 +59,7 @@ public final class PantheonOptionsScreen extends Screen {
 			this.working.enableHotbarOwnership, v -> this.working.enableHotbarOwnership = v);
 		ownershipToggle.active = !this.working.twoHandSlotMode;
 		content.addChild(ownershipToggle);
-		content.addChild(toggleRow("Two-hand mode: only one hotbar slot + off-hand selectable",
+		content.addChild(toggleRow("Two-hand mode",
 			this.working.twoHandSlotMode, v -> {
 				this.working.twoHandSlotMode = v;
 				if (v) {

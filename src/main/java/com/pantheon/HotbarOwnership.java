@@ -141,12 +141,10 @@ public final class HotbarOwnership {
 
 		int finalSlot = mySlot;
 		if (contested) {
-			for (int i = 0; i < HotbarOwnersPayload.SLOT_COUNT; i++) {
-				if (!takenByOthers[i]) {
-					finalSlot = i;
-					player.getInventory().setSelectedSlot(i);
-					break;
-				}
+			int free = firstFreeSlot(takenByOthers);
+			if (free >= 0) {
+				finalSlot = free;
+				player.getInventory().setSelectedSlot(free);
 			}
 			PantheonMod.LOGGER.info("[HotbarOwnership] resolveSlotConflict: {} moved from contested slot {} to {} in team '{}'",
 				player.getGameProfile().name(), mySlot, finalSlot, team.name);
@@ -156,6 +154,62 @@ public final class HotbarOwnership {
 		}
 
 		ServerPlayNetworking.send(player, new ForceHotbarSlotPayload(finalSlot));
+	}
+
+	/**
+	 * Called right when {@link PantheonConfig#enableHotbarOwnership}
+	 * transitions from off to on - most notably when two-hand mode (which
+	 * forces every online player onto slot 0) is turned back off and this
+	 * restores ownership with it, but just as easily several players who
+	 * happened to park on the same slot while ownership was off. Left alone,
+	 * {@link #currentOwners} correctly treats that as an unowned tie
+	 * server-side, but each client's own {@code effectiveOwner} local
+	 * prediction shows *itself* as the owner of whatever slot it currently
+	 * has selected regardless of any tie - so every one of those players
+	 * would see their own color painted over that same slot until they
+	 * happen to manually move off it. Spreading every team's tied-up members
+	 * out across distinct free slots up front, before the first ownership
+	 * broadcast after the transition, avoids that altogether.
+	 */
+	public static void spreadOutOnEnable(final MinecraftServer server) {
+		for (Map.Entry<Team, List<ServerPlayer>> entry : TeamManager.groupOnlineByTeam(server).entrySet()) {
+			boolean[] taken = new boolean[HotbarOwnersPayload.SLOT_COUNT];
+			for (ServerPlayer player : entry.getValue()) {
+				if (player.getHealth() <= 0f) {
+					// Dead, sitting on the death screen - not actually using
+					// their selected slot right now (see currentOwners), so
+					// they shouldn't reserve it from a live teammate, or need
+					// moving off it themselves.
+					continue;
+				}
+				int slot = player.getInventory().getSelectedSlot();
+				if (slot >= 0 && slot < HotbarOwnersPayload.SLOT_COUNT && !taken[slot]) {
+					taken[slot] = true;
+					continue;
+				}
+				int free = firstFreeSlot(taken);
+				if (free < 0) {
+					// Can't happen while the HOTBAR_OWNERSHIP_PLAYER_CAP team
+					// size cap holds - there's always at least one free slot
+					// for one more team member - but leave them where they
+					// are rather than throw if that invariant is ever broken.
+					continue;
+				}
+				taken[free] = true;
+				player.getInventory().setSelectedSlot(free);
+				ServerPlayNetworking.send(player, new ForceHotbarSlotPayload(free));
+			}
+		}
+	}
+
+	/** Index of the first slot not marked {@code taken}, or -1 if every slot is. */
+	private static int firstFreeSlot(final boolean[] taken) {
+		for (int i = 0; i < taken.length; i++) {
+			if (!taken[i]) {
+				return i;
+			}
+		}
+		return -1;
 	}
 
 	/**

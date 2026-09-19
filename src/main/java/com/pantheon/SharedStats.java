@@ -302,24 +302,35 @@ public final class SharedStats {
 	}
 
 	/**
-	 * Mirrors {@link #tickHunger} but for experience level + progress-within-level.
-	 * {@code experienceLevel}/{@code experienceProgress} are copied directly
-	 * (same approach as food level/saturation) rather than converting through
-	 * a combined "total XP" number, so a level-up from one teammate's own kill
-	 * or mining shows up for the rest of the team exactly as it happened.
+	 * Mirrors {@link #tickHunger} but for experience level + progress-within-level,
+	 * with one important difference: unlike hunger/health (which represent a
+	 * current *state* that one changed value can simply replace), experience
+	 * has a real "spend" action (an anvil, villager trades, ...), so two
+	 * teammates' changes landing in the same tick have to be genuinely
+	 * <em>composed</em> rather than one picked as "the" new value - picking
+	 * either one as a winner (tried and reverted twice: preferring whichever
+	 * was numerically higher let a simultaneous small gain fully cancel out
+	 * an arbitrarily large spend for free; preferring decreases instead just
+	 * meant a genuine simultaneous gain got permanently overwritten back down
+	 * along with it, not merely "delayed" as that version's own comment
+	 * incorrectly claimed - {@code setExperienceLevels} really does force
+	 * every online player, including the one who owns the gain, down to
+	 * whatever's picked) silently destroys whichever real event didn't win.
 	 *
-	 * <p>Unlike hunger, experience has a real "spend" action (an anvil,
-	 * villager trades, ...) that must never be silently undone - so when a
-	 * decrease and an increase both show up in the same tick (someone pays an
-	 * anvil cost the very tick a teammate picks up an XP orb), the decrease
-	 * always wins regardless of size: reversing that would hand back spent
-	 * levels for free, repeatably, which is exactly the kind of thing a
-	 * player could deliberately time to happen. A delayed-by-one-tick gain
-	 * has no such exploit - it's just briefly overwritten and, if it was a
-	 * real standalone gain, shows up again as soon as it next differs from
-	 * whatever the pool settles on. Ties within the same direction still
-	 * prefer the more extreme value (most spent / most gained), same
-	 * reasoning as {@link #tickHunger}.
+	 * <p>Instead, each already-tracked player's own delta since last tick
+	 * (positive for a gain, negative for a spend) is summed and applied to
+	 * the pool as one net adjustment: a spend still always reduces the pool
+	 * by exactly what it cost, no matter what else happens to land in the
+	 * same tick, so there's nothing to time for free levels; a simultaneous
+	 * gain from someone else adds on top rather than getting thrown away.
+	 * Level and progress-within-level are combined into one float
+	 * ({@code level + progress}) purely so deltas from players sitting at
+	 * different levels (and therefore different actual XP-per-level costs)
+	 * can be summed at all without reimplementing vanilla's XP curve - this
+	 * is an approximation, not a true XP-point delta, but it's only ever
+	 * applied to the small, single-tick deltas that prompted it and is
+	 * immediately re-observed and corrected from every player's own real
+	 * vanilla state next tick, so it doesn't accumulate error over time.
 	 */
 	private static void tickExperience(final Team team, final List<ServerPlayer> online) {
 		if (online.isEmpty()) {
@@ -328,46 +339,29 @@ public final class SharedStats {
 		team.lastSyncedExperienceLevel.keySet().retainAll(uuids(online));
 		team.lastSyncedExperienceProgress.keySet().retainAll(uuids(online));
 
-		Integer bestLevel = null;
-		Float bestProgress = null;
-		Boolean bestIsDecrease = null;
-		for (ServerPlayer player : online) {
-			Integer previousLevel = team.lastSyncedExperienceLevel.get(player.getUUID());
-			Float previousProgress = team.lastSyncedExperienceProgress.get(player.getUUID());
-			int level = player.experienceLevel;
-			float progress = player.experienceProgress;
-			boolean changed = (previousLevel != null && previousLevel.intValue() != level)
-				|| (previousProgress != null && previousProgress.floatValue() != progress);
-			if (!changed) {
-				continue;
-			}
-			boolean isDecrease = previousLevel != null
-				&& (level < previousLevel || (level == previousLevel && progress < previousProgress));
-
-			boolean candidateWins;
-			if (bestLevel == null) {
-				candidateWins = true;
-			} else if (isDecrease != bestIsDecrease) {
-				candidateWins = isDecrease;
-			} else if (isDecrease) {
-				candidateWins = level < bestLevel || (level == bestLevel && progress < bestProgress);
-			} else {
-				candidateWins = level > bestLevel || (level == bestLevel && progress > bestProgress);
-			}
-
-			if (candidateWins) {
-				bestLevel = level;
-				bestProgress = progress;
-				bestIsDecrease = isDecrease;
-			}
-		}
-		if (bestLevel != null) {
-			team.sharedExperienceLevel = bestLevel;
-			team.sharedExperienceProgress = bestProgress;
-		}
 		if (team.sharedExperienceLevel == null) {
 			team.sharedExperienceLevel = online.get(0).experienceLevel;
 			team.sharedExperienceProgress = online.get(0).experienceProgress;
+		} else {
+			float netDelta = 0f;
+			for (ServerPlayer player : online) {
+				Integer previousLevel = team.lastSyncedExperienceLevel.get(player.getUUID());
+				Float previousProgress = team.lastSyncedExperienceProgress.get(player.getUUID());
+				if (previousLevel == null || previousProgress == null) {
+					// Not tracked yet (a fresh join) - they adopt the pool via
+					// the propagation loop below instead of contributing a
+					// delta of their own this tick.
+					continue;
+				}
+				float previousValue = previousLevel.floatValue() + previousProgress.floatValue();
+				float currentValue = player.experienceLevel + player.experienceProgress;
+				netDelta += currentValue - previousValue;
+			}
+			if (netDelta != 0f) {
+				float newValue = Math.max(0f, team.sharedExperienceLevel + team.sharedExperienceProgress + netDelta);
+				team.sharedExperienceLevel = (int) newValue;
+				team.sharedExperienceProgress = newValue - team.sharedExperienceLevel;
+			}
 		}
 
 		for (ServerPlayer player : online) {

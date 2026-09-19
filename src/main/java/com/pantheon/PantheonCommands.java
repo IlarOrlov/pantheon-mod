@@ -5,10 +5,8 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
 
 import com.pantheon.network.PantheonNetworking;
-import com.pantheon.network.SyncConfigPayload;
 
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
-import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -129,18 +127,13 @@ public final class PantheonCommands {
 		}
 
 		MinecraftServer server = source.getServer();
-		EquipmentSharingTransfer.handle(server, PantheonConfig.get(), config);
-		PantheonConfig updated = PantheonConfig.applyAndSave(config);
-
-		SyncConfigPayload syncPayload = SyncConfigPayload.fromConfig(updated);
-		for (ServerPlayer online : server.getPlayerList().getPlayers()) {
-			ServerPlayNetworking.send(online, syncPayload);
-		}
+		PantheonConfig oldConfig = PantheonConfig.get();
 		// teamsEnabled flipping changes what every online player's Inventory
 		// should point at (the global team vs. their individually assigned
-		// one) - re-point them all rather than waiting for their next rejoin.
-		TeamManager.reassignAllOnline(server);
-		HotbarOwnership.broadcast(server);
+		// one); PantheonNetworking.applyConfigChange re-points them all as
+		// part of its shared sequence, rather than waiting for their next
+		// rejoin - see its own doc for the rest of what it does.
+		PantheonConfig updated = PantheonNetworking.applyConfigChange(server, config);
 
 		boolean requested = Boolean.parseBoolean(value);
 		boolean actual = currentValue(updated, setting);
@@ -159,6 +152,12 @@ public final class PantheonCommands {
 			// calling out even though it's not what the line above checks for.
 			source.sendSystemMessage(Component.literal(
 				"Note: enableHotbarOwnership was also turned off - it can't be on at the same time as twoHandSlotMode."
+			).withStyle(ChatFormatting.YELLOW));
+		} else if ("twoHandSlotMode".equals(setting) && !updated.twoHandSlotMode && oldConfig.twoHandSlotMode) {
+			// Turning it back off restored whatever enableHotbarOwnership was
+			// before two-hand mode was turned on - equally worth calling out.
+			source.sendSystemMessage(Component.literal(
+				"Note: enableHotbarOwnership was restored to " + updated.enableHotbarOwnership + "."
 			).withStyle(ChatFormatting.YELLOW));
 		}
 		return 1;
@@ -272,17 +271,23 @@ public final class PantheonCommands {
 			return 0;
 		}
 
-		if (PantheonConfig.get().enableHotbarOwnership) {
-			Team target = TeamManager.allTeams().stream().filter(t -> t.name.equals(name)).findFirst().orElse(null);
-			int currentSize = target == null ? 0 : TeamManager.onlineMembersOf(target, server).size();
-			boolean alreadyOnTeam = TeamManager.assignedTeamName(player.getUUID()).equals(name);
-			if (!alreadyOnTeam && currentSize >= PantheonConfig.HOTBAR_OWNERSHIP_PLAYER_CAP) {
-				source.sendFailure(Component.literal(
-					"Team '" + name + "' is full: hotbar-ownership mode supports at most "
-						+ PantheonConfig.HOTBAR_OWNERSHIP_PLAYER_CAP + " players per team."
-				));
-				return 0;
-			}
+		// Enforced regardless of whether hotbar ownership or two-hand mode is
+		// on right now - both rely on there being at most 9 online team
+		// members (one per hotbar slot) whenever either gets turned on,
+		// including implicitly via turning two-hand mode back off
+		// (PantheonConfig#reconcileTwoHandTransition), so a team that grew
+		// past 9 while neither was active would immediately break
+		// HotbarOwnership#spreadOutOnEnable's "always at least one free slot"
+		// assumption the moment one of them did turn on.
+		Team target = TeamManager.allTeams().stream().filter(t -> t.name.equals(name)).findFirst().orElse(null);
+		int currentSize = target == null ? 0 : TeamManager.onlineMembersOf(target, server).size();
+		boolean alreadyOnTeam = TeamManager.assignedTeamName(player.getUUID()).equals(name);
+		if (!alreadyOnTeam && currentSize >= PantheonConfig.HOTBAR_OWNERSHIP_PLAYER_CAP) {
+			source.sendFailure(Component.literal(
+				"Team '" + name + "' is full: at most "
+					+ PantheonConfig.HOTBAR_OWNERSHIP_PLAYER_CAP + " players per team are supported."
+			));
+			return 0;
 		}
 
 		TeamManager.assign(player.getUUID(), name);

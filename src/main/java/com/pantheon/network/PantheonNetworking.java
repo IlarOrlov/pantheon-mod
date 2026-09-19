@@ -105,11 +105,26 @@ public final class PantheonNetworking {
 			return;
 		}
 
+		PantheonConfig updated = applyConfigChange(server, payload.toConfig());
+		PantheonMod.LOGGER.info("Pantheon config changed by {}: {}", player.getGameProfile().name(), updated);
+	}
+
+	/**
+	 * The full sequence a config change goes through, regardless of whether
+	 * it came from a player's settings screen (via {@link #handleUpdateConfig})
+	 * or an op's {@code /pantheon config} command ({@code PantheonCommands}):
+	 * apply + persist it, migrate equipment before the old sharing rules stop
+	 * applying, push it to every client, re-point shared inventories, untangle
+	 * any hotbar-ownership pile-up the change caused, and re-broadcast
+	 * ownership. Centralized here (rather than duplicated at both call sites)
+	 * so they can't quietly drift apart on which of these steps they remember
+	 * to do - a future step added to only one of them would silently diverge
+	 * behavior between the two paths.
+	 */
+	public static PantheonConfig applyConfigChange(final MinecraftServer server, final PantheonConfig newConfig) {
 		PantheonConfig oldConfig = PantheonConfig.get();
-		PantheonConfig newConfig = payload.toConfig();
 		EquipmentSharingTransfer.handle(server, oldConfig, newConfig);
 		PantheonConfig updated = PantheonConfig.applyAndSave(newConfig);
-		PantheonMod.LOGGER.info("Pantheon config changed by {}: {}", player.getGameProfile().name(), updated);
 
 		SyncConfigPayload syncPayload = SyncConfigPayload.fromConfig(updated);
 		for (ServerPlayer online : server.getPlayerList().getPlayers()) {
@@ -117,7 +132,11 @@ public final class PantheonNetworking {
 		}
 
 		TeamManager.reassignAllOnline(server);
+		if (!oldConfig.enableHotbarOwnership && updated.enableHotbarOwnership) {
+			HotbarOwnership.spreadOutOnEnable(server);
+		}
 		HotbarOwnership.broadcast(server);
+		return updated;
 	}
 
 	/** The singleplayer host, or a server operator, may change Pantheon's shared settings. */

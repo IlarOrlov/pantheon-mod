@@ -61,6 +61,7 @@ public class PantheonModClient implements ClientModInitializer {
 
 		HudElementRegistry.attachElementAfter(VanillaHudElements.HOTBAR, PantheonMod.id("hotbar_owners"), new HotbarOwnerOverlay());
 		HudElementRegistry.attachElementAfter(VanillaHudElements.HOTBAR, PantheonMod.id("low_health_warning"), new LowHealthOverlay());
+		HudElementRegistry.attachElementAfter(VanillaHudElements.HOTBAR, PantheonMod.id("two_hand_hotbar"), new TwoHandHotbarOverlay());
 
 		KeyMapping.Category category = KeyMapping.Category.register(PantheonMod.id("main"));
 		openSettingsKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(

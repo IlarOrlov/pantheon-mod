@@ -53,6 +53,14 @@ public final class PantheonConfig {
 	 * (see {@link #normalize()}).
 	 */
 	public boolean twoHandSlotMode = false;
+	/**
+	 * What {@link #enableHotbarOwnership} was set to right before
+	 * {@link #twoHandSlotMode} was most recently turned on - so turning
+	 * two-hand mode back off can restore it instead of just leaving
+	 * ownership off. Maintained by {@link #reconcileTwoHandTransition},
+	 * not something any UI/command directly sets.
+	 */
+	public boolean hotbarOwnershipBeforeTwoHand = true;
 
 	public static PantheonConfig get() {
 		return instance;
@@ -70,6 +78,41 @@ public final class PantheonConfig {
 	public void normalize() {
 		if (this.twoHandSlotMode) {
 			this.enableHotbarOwnership = false;
+		}
+	}
+
+	/**
+	 * Carries {@link #enableHotbarOwnership} across a {@link #twoHandSlotMode}
+	 * toggle instead of just always forcing it off: turning two-hand mode on
+	 * remembers whatever ownership currently is, and turning it back off
+	 * restores that remembered value - overriding whatever raw value the
+	 * request happened to carry for it, since a client can't meaningfully
+	 * express "leave ownership alone" versus "I want it off" in a plain
+	 * boolean payload.
+	 *
+	 * <p>Always reads {@code oldConfig} (the server's own still-live config
+	 * right before this call, i.e. {@code instance} inside {@link #applyAndSave})
+	 * rather than whatever {@code newConfig} carries for
+	 * {@link #hotbarOwnershipBeforeTwoHand}, since {@code newConfig} can come
+	 * straight off a network payload that never had a reason to carry that
+	 * bookkeeping field at all - and would otherwise silently reset it to the
+	 * class default on every unrelated settings change made while two-hand
+	 * mode is on. For the same reason this unconditionally copies it onto
+	 * {@code newConfig} in every case, not just the two transition branches,
+	 * so it's never accidentally left at that default.
+	 *
+	 * <p>Called only from {@link #applyAndSave} - the one chokepoint every
+	 * config write already goes through - rather than expecting every
+	 * call site to remember to invoke it themselves in the right order.
+	 */
+	private static void reconcileTwoHandTransition(final PantheonConfig oldConfig, final PantheonConfig newConfig) {
+		if (newConfig.twoHandSlotMode && !oldConfig.twoHandSlotMode) {
+			newConfig.hotbarOwnershipBeforeTwoHand = oldConfig.enableHotbarOwnership;
+		} else if (!newConfig.twoHandSlotMode && oldConfig.twoHandSlotMode) {
+			newConfig.enableHotbarOwnership = oldConfig.hotbarOwnershipBeforeTwoHand;
+			newConfig.hotbarOwnershipBeforeTwoHand = oldConfig.hotbarOwnershipBeforeTwoHand;
+		} else {
+			newConfig.hotbarOwnershipBeforeTwoHand = oldConfig.hotbarOwnershipBeforeTwoHand;
 		}
 	}
 
@@ -129,6 +172,7 @@ public final class PantheonConfig {
 
 	/** Replaces the live config, persists it, and returns it so callers can broadcast it. */
 	public static synchronized PantheonConfig applyAndSave(final PantheonConfig updated) {
+		reconcileTwoHandTransition(instance, updated);
 		updated.normalize();
 		instance = updated;
 		save();
@@ -147,6 +191,7 @@ public final class PantheonConfig {
 		copy.teamsEnabled = this.teamsEnabled;
 		copy.crudeHumor = this.crudeHumor;
 		copy.twoHandSlotMode = this.twoHandSlotMode;
+		copy.hotbarOwnershipBeforeTwoHand = this.hotbarOwnershipBeforeTwoHand;
 		return copy;
 	}
 
@@ -160,6 +205,7 @@ public final class PantheonConfig {
 			+ ", syncEffects=" + config.syncEffects
 			+ ", teamsEnabled=" + config.teamsEnabled
 			+ ", crudeHumor=" + config.crudeHumor
-			+ ", twoHandSlotMode=" + config.twoHandSlotMode;
+			+ ", twoHandSlotMode=" + config.twoHandSlotMode
+			+ ", hotbarOwnershipBeforeTwoHand=" + config.hotbarOwnershipBeforeTwoHand;
 	}
 }
