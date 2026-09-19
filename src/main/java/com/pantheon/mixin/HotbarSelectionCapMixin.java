@@ -37,7 +37,7 @@ public abstract class HotbarSelectionCapMixin {
 			return;
 		}
 
-		if (PantheonConfig.get().twoHandSlotMode && slot != 0) {
+		if (PantheonConfig.get().twoHandSlotMode && slot != HotbarOwnersPayload.TWO_HAND_ACTIVE_SLOT) {
 			ci.cancel();
 			return;
 		}

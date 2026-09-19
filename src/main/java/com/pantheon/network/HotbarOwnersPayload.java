@@ -22,6 +22,8 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
  */
 public record HotbarOwnersPayload(List<UUID> owners) implements CustomPacketPayload {
 	public static final int SLOT_COUNT = 9;
+	/** The one hotbar slot two-hand mode leaves selectable - the center slot, not slot 0, so it sits under the crosshair rather than the far left edge. */
+	public static final int TWO_HAND_ACTIVE_SLOT = SLOT_COUNT / 2;
 	public static final UUID NO_OWNER = new UUID(0L, 0L);
 
 	public static final CustomPacketPayload.Type<HotbarOwnersPayload> TYPE = new CustomPacketPayload.Type<>(PantheonMod.id("hotbar_owners"));

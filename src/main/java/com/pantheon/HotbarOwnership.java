@@ -159,7 +159,7 @@ public final class HotbarOwnership {
 	/**
 	 * Called right when {@link PantheonConfig#enableHotbarOwnership}
 	 * transitions from off to on - most notably when two-hand mode (which
-	 * forces every online player onto slot 0) is turned back off and this
+	 * forces every online player onto the center slot) is turned back off and this
 	 * restores ownership with it, but just as easily several players who
 	 * happened to park on the same slot while ownership was off. Left alone,
 	 * {@link #currentOwners} correctly treats that as an unowned tie
@@ -213,7 +213,8 @@ public final class HotbarOwnership {
 	}
 
 	/**
-	 * Two-hand mode leaves exactly one selectable hotbar slot (index 0); a
+	 * Two-hand mode leaves exactly one selectable hotbar slot
+	 * ({@link HotbarOwnersPayload#TWO_HAND_ACTIVE_SLOT}, the center slot); a
 	 * player can still show up with a different slot selected - loaded from
 	 * their own save data from before the mode was turned on, or a stale
 	 * client-predicted selection - so force it back every tick rather than
@@ -225,16 +226,24 @@ public final class HotbarOwnership {
 			return;
 		}
 		for (ServerPlayer player : server.getPlayerList().getPlayers()) {
-			if (player.getInventory().getSelectedSlot() != 0) {
-				player.getInventory().setSelectedSlot(0);
-				ServerPlayNetworking.send(player, new ForceHotbarSlotPayload(0));
+			if (player.getInventory().getSelectedSlot() != HotbarOwnersPayload.TWO_HAND_ACTIVE_SLOT) {
+				player.getInventory().setSelectedSlot(HotbarOwnersPayload.TWO_HAND_ACTIVE_SLOT);
+				ServerPlayNetworking.send(player, new ForceHotbarSlotPayload(HotbarOwnersPayload.TWO_HAND_ACTIVE_SLOT));
 			}
 		}
 	}
 
-	/** Recomputes ownership per online team and, only for teams where it changed since the last check, pushes it to that team's clients. */
-	public static void tick(final MinecraftServer server) {
-		for (Map.Entry<Team, List<ServerPlayer>> entry : TeamManager.groupOnlineByTeam(server).entrySet()) {
+	/**
+	 * Recomputes ownership per online team and, only for teams where it
+	 * changed since the last check, pushes it to that team's clients. Takes
+	 * the online-players-by-team grouping already computed by the caller
+	 * (rather than a {@code MinecraftServer} it would have to group itself)
+	 * since it's always called from {@link PantheonMod}'s per-tick handler
+	 * right alongside {@link SharedStats#tick}, which needs the exact same
+	 * grouping - computing it twice, every tick, would be pure waste.
+	 */
+	public static void tick(final Map<Team, List<ServerPlayer>> onlineByTeam) {
+		for (Map.Entry<Team, List<ServerPlayer>> entry : onlineByTeam.entrySet()) {
 			Team team = entry.getKey();
 			List<ServerPlayer> members = entry.getValue();
 			List<UUID> owners = currentOwners(members);
@@ -246,7 +255,12 @@ public final class HotbarOwnership {
 
 	/** Recomputes ownership for every online team and unconditionally pushes it to each team's clients (join/disconnect/periodic resync/config change). */
 	public static void broadcast(final MinecraftServer server) {
-		for (Map.Entry<Team, List<ServerPlayer>> entry : TeamManager.groupOnlineByTeam(server).entrySet()) {
+		broadcast(TeamManager.groupOnlineByTeam(server));
+	}
+
+	/** Same as {@link #broadcast(MinecraftServer)}, for a caller (the per-tick periodic resync) that already has the grouping on hand. */
+	public static void broadcast(final Map<Team, List<ServerPlayer>> onlineByTeam) {
+		for (Map.Entry<Team, List<ServerPlayer>> entry : onlineByTeam.entrySet()) {
 			Team team = entry.getKey();
 			List<ServerPlayer> members = entry.getValue();
 			sendToTeam(team, members, currentOwners(members));

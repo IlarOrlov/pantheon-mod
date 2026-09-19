@@ -45,7 +45,8 @@ public final class PantheonConfig {
 	/** When on, the propagated-death jokes can also draw from a cruder, swear-heavier phrase pool. Off by default. */
 	public boolean crudeHumor = false;
 	/**
-	 * When on, only a single hotbar slot (index 0, the "main hand") can ever be
+	 * When on, only a single hotbar slot (the center slot, {@code
+	 * HotbarOwnersPayload#TWO_HAND_ACTIVE_SLOT}, the "main hand") can ever be
 	 * selected - together with the always-available off-hand slot, that's the
 	 * "two hands" the mode is named for. Mutually exclusive with
 	 * {@link #enableHotbarOwnership}: per-slot ownership has nothing to lock

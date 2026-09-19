@@ -63,7 +63,7 @@ public abstract class HotbarLockFrameMixin {
 			int y = slot.y - 1;
 
 			if (twoHandMode) {
-				if (index != 0) {
+				if (index != HotbarOwnersPayload.TWO_HAND_ACTIVE_SLOT) {
 					// Two-hand mode only has one usable hotbar slot - cover the
 					// other eight here too, not just on the main HUD, with a
 					// plain panel-gray fill matching vanilla's own inventory

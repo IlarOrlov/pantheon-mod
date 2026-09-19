@@ -34,10 +34,25 @@ public final class PantheonOptionsScreen extends Screen {
 	private final HeaderAndFooterLayout layout = new HeaderAndFooterLayout(this);
 	private ScrollableLayout scrollArea;
 
+	/**
+	 * What {@link PantheonConfig#enableHotbarOwnership} should go back to if
+	 * "Two-hand mode" is switched off again within this same screen session
+	 * (before Save), mirroring {@link PantheonConfig#hotbarOwnershipBeforeTwoHand}
+	 * for changes that never leave the client. Seeded from that same field so
+	 * a screen opened while two-hand mode is already on restores correctly on
+	 * its very first toggle-off, then kept live afterward: every toggle-on
+	 * recaptures whatever the ownership toggle is showing at that moment,
+	 * since the player may have flipped it manually earlier in this same
+	 * session, which {@code hotbarOwnershipBeforeTwoHand} alone wouldn't know
+	 * about.
+	 */
+	private boolean ownershipBeforeTwoHand;
+
 	public PantheonOptionsScreen(final Screen parent, final PantheonConfig initial) {
 		super(Component.literal("Pantheon Settings"));
 		this.parent = parent;
 		this.working = initial.copy();
+		this.ownershipBeforeTwoHand = initial.hotbarOwnershipBeforeTwoHand;
 	}
 
 	@Override
@@ -63,8 +78,12 @@ public final class PantheonOptionsScreen extends Screen {
 			this.working.twoHandSlotMode, v -> {
 				this.working.twoHandSlotMode = v;
 				if (v) {
+					this.ownershipBeforeTwoHand = this.working.enableHotbarOwnership;
 					this.working.enableHotbarOwnership = false;
 					ownershipToggle.setValue(false);
+				} else {
+					this.working.enableHotbarOwnership = this.ownershipBeforeTwoHand;
+					ownershipToggle.setValue(this.ownershipBeforeTwoHand);
 				}
 				ownershipToggle.active = !v;
 			}));

@@ -158,9 +158,10 @@ public class PantheonModClient implements ClientModInitializer {
 
 	/**
 	 * Whether {@code slot} is currently locked to some other online player
-	 * (not us, not unowned) - or, in two-hand mode, simply not slot 0, since
-	 * every slot but the one selectable main-hand slot is effectively "locked"
-	 * to nobody being allowed to select it at all. Reusing this single check
+	 * (not us, not unowned) - or, in two-hand mode, simply not the center
+	 * slot ({@link HotbarOwnersPayload#TWO_HAND_ACTIVE_SLOT}), since every
+	 * slot but the one selectable main-hand slot is effectively "locked" to
+	 * nobody being allowed to select it at all. Reusing this single check
 	 * lets the scroll-skip and number-key mixins enforce two-hand mode for
 	 * free, with no changes of their own.
 	 */
@@ -169,7 +170,7 @@ public class PantheonModClient implements ClientModInitializer {
 			return false;
 		}
 		if (lastKnownConfig.twoHandSlotMode) {
-			return slot != 0;
+			return slot != HotbarOwnersPayload.TWO_HAND_ACTIVE_SLOT;
 		}
 		Minecraft minecraft = Minecraft.getInstance();
 		if (minecraft.player == null) {
