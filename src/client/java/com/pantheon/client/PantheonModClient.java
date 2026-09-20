@@ -29,6 +29,8 @@ import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.inventory.Slot;
 
+import org.lwjgl.sdl.SDLMouse;
+
 public class PantheonModClient implements ClientModInitializer {
 	private static volatile List<UUID> hotbarOwners = emptyOwners();
 	private static volatile PantheonConfig lastKnownConfig = new PantheonConfig();
@@ -66,13 +68,13 @@ public class PantheonModClient implements ClientModInitializer {
 		KeyMapping.Category category = KeyMapping.Category.register(PantheonMod.id("main"));
 		openSettingsKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
 			"key.pantheon.open_settings",
-			InputConstants.Type.KEYSYM,
+			InputConstants.Type.KEYBOARD,
 			InputConstants.UNKNOWN.getValue(),
 			category
 		));
 		requestSlotKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
 			"key.pantheon.request_slot",
-			InputConstants.Type.KEYSYM,
+			InputConstants.Type.KEYBOARD,
 			InputConstants.UNKNOWN.getValue(),
 			category
 		));
@@ -92,7 +94,7 @@ public class PantheonModClient implements ClientModInitializer {
 			// container screen has focus - exactly the situation it's meant for.
 			// Poll the physical key state directly instead, with our own
 			// rising-edge detection so a held key doesn't fire every tick.
-			boolean physicallyDown = isRequestSlotKeyPhysicallyDown(client);
+			boolean physicallyDown = isRequestSlotKeyPhysicallyDown();
 			if (physicallyDown && !requestSlotKeyWasPhysicallyDown) {
 				requestHoveredSlot(client);
 			}
@@ -100,17 +102,21 @@ public class PantheonModClient implements ClientModInitializer {
 		});
 	}
 
-	private static boolean isRequestSlotKeyPhysicallyDown(final Minecraft client) {
+	private static boolean isRequestSlotKeyPhysicallyDown() {
 		InputConstants.Key key = ((KeyMappingKeyAccessor) requestSlotKey).pantheon$getKey();
 		if (key.equals(InputConstants.UNKNOWN)) {
 			return false;
 		}
 		if (key.getType() == InputConstants.Type.MOUSE) {
-			long handle = client.getWindow().handle();
-			return org.lwjgl.glfw.GLFW.glfwGetMouseButton(handle, key.getValue()) == org.lwjgl.glfw.GLFW.GLFW_PRESS;
+			// InputConstants.MOUSE_BUTTON_* are SDL's own 1-based button
+			// numbers (left=1, middle=2, right=3, ...) - SDL_GetMouseState's
+			// bitmask is built the same way SDL_BUTTON_MASK does internally
+			// (1 << (button - 1)), which isn't exposed as public API itself.
+			int buttonMask = 1 << (key.getValue() - 1);
+			return (SDLMouse.SDL_GetMouseState(null, null) & buttonMask) != 0;
 		}
-		if (key.getType() == InputConstants.Type.KEYSYM) {
-			return InputConstants.isKeyDown(client.getWindow(), key.getValue());
+		if (key.getType() == InputConstants.Type.KEYBOARD) {
+			return InputConstants.isKeyDown(key.getValue());
 		}
 		return false;
 	}

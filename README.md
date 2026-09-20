@@ -50,14 +50,14 @@ Which teams exist and each player's assignment are saved to `config/pantheon-tea
 
 | | |
 |---|---|
-| Minecraft | 26.2 |
+| Minecraft | 26.3 |
 | Fabric Loader | ≥ 0.19.5 |
 | Fabric API | required |
 | Java | ≥ 25 |
 
 ## Installation
 
-1. Install [Fabric Loader](https://fabricmc.net/use/) for Minecraft 26.2.
+1. Install [Fabric Loader](https://fabricmc.net/use/) for Minecraft 26.3.
 2. Download [Fabric API](https://modrinth.com/mod/fabric-api) for the same version.
 3. Grab the latest `pantheon-*.jar` from [Releases](https://github.com/IlarOrlov/pantheon-mod/releases) and drop it into your server's (or client's, for singleplayer/LAN) `mods` folder.
 
