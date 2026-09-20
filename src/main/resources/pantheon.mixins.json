@@ -11,6 +11,8 @@
 		"HotbarRespawnMixin",
 		"HotbarSelectionCapMixin",
 		"SharedHungerWasteMixin",
+		"TwoHandAutoSlotMixin",
+		"TwoHandSlotMayPlaceMixin",
 		"UnsharedEquipmentDeathDropMixin"
 	],
 	"injectors": {

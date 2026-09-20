@@ -38,9 +38,13 @@ import net.minecraft.world.item.ItemStack;
  *   same-tick revert could undo without leaving a duplicated item behind.</li>
  *   <li>As a backstop for indirect landings vanilla picks internally - e.g.
  *   shift-clicking a stack in from a chest, where the destination hotbar
- *   slot isn't a parameter we can check up front - the 9 hotbar slots and
- *   the cursor are snapshotted before the click and restored if a locked
- *   slot ends up changed anyway.</li>
+ *   slot isn't a parameter we can check up front - the <em>entire</em>
+ *   36-slot shared inventory and the cursor are snapshotted before the
+ *   click and restored if a locked slot ends up changed anyway. The whole
+ *   inventory, not just the 9 hotbar slots, because a shift-click's source
+ *   is just as often the other 27 slots - restoring only the destination
+ *   after vanilla already emptied the source would lose the item outright,
+ *   not just misplace it.</li>
  * </ol>
  *
  * <p>What counts as "locked" depends on which of two mutually-exclusive
@@ -105,7 +109,7 @@ public abstract class HotbarLockMixin {
 		}
 
 		Team team = TeamManager.teamOf(serverPlayer);
-		ItemStack[] snapshot = new ItemStack[HotbarOwnersPayload.SLOT_COUNT];
+		ItemStack[] snapshot = new ItemStack[team.items.size()];
 		for (int i = 0; i < snapshot.length; i++) {
 			snapshot[i] = team.items.get(i).copy();
 		}

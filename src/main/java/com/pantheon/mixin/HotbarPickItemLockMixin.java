@@ -14,7 +14,6 @@ import com.pantheon.HotbarOwnership;
 import com.pantheon.PantheonConfig;
 import com.pantheon.Team;
 import com.pantheon.TeamManager;
-import com.pantheon.network.HotbarOwnersPayload;
 
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
@@ -59,7 +58,11 @@ public abstract class HotbarPickItemLockMixin {
 		}
 
 		Team team = TeamManager.teamOf(this.player);
-		ItemStack[] snapshot = new ItemStack[HotbarOwnersPayload.SLOT_COUNT];
+		// The whole 36-slot inventory, not just the hotbar: pickSlot's
+		// source (an existing matching stack) is just as often one of the
+		// other 27 slots, and restoring only the hotbar destination after
+		// vanilla already emptied that source would lose the item outright.
+		ItemStack[] snapshot = new ItemStack[team.items.size()];
 		for (int i = 0; i < snapshot.length; i++) {
 			snapshot[i] = team.items.get(i).copy();
 		}
