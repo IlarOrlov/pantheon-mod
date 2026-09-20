@@ -2,6 +2,7 @@ package com.pantheon.client;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import com.pantheon.PantheonConfig;
@@ -33,6 +34,12 @@ import org.lwjgl.sdl.SDLMouse;
 
 public class PantheonModClient implements ClientModInitializer {
 	private static volatile List<UUID> hotbarOwners = emptyOwners();
+	// Recomputed only when hotbarOwners itself changes (right below), not on
+	// every render call - HotbarColors#assignColors does real work (a
+	// collision search per colliding teammate) that only ever needs
+	// redoing when who owns what has actually changed, not every single
+	// frame the HUD or an inventory screen happens to draw the frames.
+	private static volatile Map<UUID, Integer> hotbarColors = Map.of();
 	private static volatile PantheonConfig lastKnownConfig = new PantheonConfig();
 
 	private static KeyMapping openSettingsKey;
@@ -45,6 +52,7 @@ public class PantheonModClient implements ClientModInitializer {
 
 		ClientPlayNetworking.registerGlobalReceiver(HotbarOwnersPayload.TYPE, (payload, context) -> {
 			hotbarOwners = payload.owners();
+			hotbarColors = HotbarColors.assignColors(hotbarOwners);
 			int localSelected = context.player() != null ? context.player().getInventory().getSelectedSlot() : -1;
 			PantheonMod.LOGGER.info("[PantheonModClient] received owners={} (our own selected slot locally = {})", payload.owners(), localSelected);
 		});
@@ -152,6 +160,11 @@ public class PantheonModClient implements ClientModInitializer {
 
 	public static List<UUID> getHotbarOwners() {
 		return hotbarOwners;
+	}
+
+	/** The color each currently-online teammate's hotbar-lock frame should be drawn in - see {@link HotbarColors#assignColors}. Recomputed once per broadcast, not per caller. */
+	public static Map<UUID, Integer> getHotbarColors() {
+		return hotbarColors;
 	}
 
 	public static PantheonConfig getLastKnownConfig() {

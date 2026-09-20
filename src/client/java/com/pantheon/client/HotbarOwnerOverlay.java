@@ -1,5 +1,6 @@
 package com.pantheon.client;
 
+import java.util.Map;
 import java.util.UUID;
 
 import com.pantheon.network.HotbarOwnersPayload;
@@ -37,6 +38,7 @@ public final class HotbarOwnerOverlay implements HudElement {
 		int left = graphics.guiWidth() / 2 - HOTBAR_WIDTH / 2;
 		int top = graphics.guiHeight() - SLOT_SIZE - 1;
 
+		Map<UUID, Integer> colors = PantheonModClient.getHotbarColors();
 		for (int slot = 0; slot < HotbarOwnersPayload.SLOT_COUNT; slot++) {
 			UUID owner = PantheonModClient.effectiveOwner(slot);
 			if (owner.equals(HotbarOwnersPayload.NO_OWNER)) {
@@ -44,8 +46,8 @@ public final class HotbarOwnerOverlay implements HudElement {
 			}
 
 			int x = left + slot * SLOT_SIZE;
-			int color = HotbarColors.colorFor(owner);
-			drawFrame(graphics, x, top, SLOT_SIZE, SLOT_SIZE, color);
+			Integer color = colors.get(owner);
+			drawFrame(graphics, x, top, SLOT_SIZE, SLOT_SIZE, color != null ? color : HotbarColors.vanillaColorFor(owner));
 		}
 	}
 

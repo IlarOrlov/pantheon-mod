@@ -81,7 +81,8 @@ public abstract class HotbarLockFrameMixin {
 				continue;
 			}
 
-			int color = HotbarColors.colorFor(owner);
+			Integer assigned = PantheonModClient.getHotbarColors().get(owner);
+			int color = assigned != null ? assigned : HotbarColors.vanillaColorFor(owner);
 			graphics.fill(x, y, x + 18, y + 1, color);
 			graphics.fill(x, y + 17, x + 18, y + 18, color);
 			graphics.fill(x, y, x + 1, y + 18, color);
