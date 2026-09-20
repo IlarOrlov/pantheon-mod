@@ -114,12 +114,13 @@ public final class PantheonNetworking {
 	 * it came from a player's settings screen (via {@link #handleUpdateConfig})
 	 * or an op's {@code /pantheon config} command ({@code PantheonCommands}):
 	 * apply + persist it, migrate equipment before the old sharing rules stop
-	 * applying, push it to every client, re-point shared inventories, untangle
-	 * any hotbar-ownership pile-up the change caused, and re-broadcast
-	 * ownership. Centralized here (rather than duplicated at both call sites)
-	 * so they can't quietly drift apart on which of these steps they remember
-	 * to do - a future step added to only one of them would silently diverge
-	 * behavior between the two paths.
+	 * applying, push it to every client, migrate whatever two-hand mode is
+	 * about to blank out of reach, re-point shared inventories, untangle any
+	 * hotbar-ownership pile-up the change caused, and re-broadcast ownership.
+	 * Centralized here (rather than duplicated at both call sites) so they
+	 * can't quietly drift apart on which of these steps they remember to do -
+	 * a future step added to only one of them would silently diverge behavior
+	 * between the two paths.
 	 */
 	public static PantheonConfig applyConfigChange(final MinecraftServer server, final PantheonConfig newConfig) {
 		PantheonConfig oldConfig = PantheonConfig.get();
@@ -131,6 +132,12 @@ public final class PantheonNetworking {
 			ServerPlayNetworking.send(online, syncPayload);
 		}
 
+		if (!oldConfig.twoHandSlotMode && updated.twoHandSlotMode) {
+			// Before reassignAllOnline's broadcastFullState below, so everyone
+			// sees the post-migration contents immediately rather than the
+			// about-to-be-relocated items still sitting in their old spots.
+			HotbarOwnership.migrateBlankedSlotsOnEnable(server);
+		}
 		TeamManager.reassignAllOnline(server);
 		if (!oldConfig.enableHotbarOwnership && updated.enableHotbarOwnership) {
 			HotbarOwnership.spreadOutOnEnable(server);

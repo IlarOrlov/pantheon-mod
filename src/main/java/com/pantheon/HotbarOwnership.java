@@ -12,6 +12,7 @@ import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.item.ItemStack;
 
 /**
  * Decides which online player "owns" each hotbar slot right now, scoped to
@@ -229,6 +230,74 @@ public final class HotbarOwnership {
 			if (player.getInventory().getSelectedSlot() != HotbarOwnersPayload.TWO_HAND_ACTIVE_SLOT) {
 				player.getInventory().setSelectedSlot(HotbarOwnersPayload.TWO_HAND_ACTIVE_SLOT);
 				ServerPlayNetworking.send(player, new ForceHotbarSlotPayload(HotbarOwnersPayload.TWO_HAND_ACTIVE_SLOT));
+			}
+		}
+	}
+
+	/**
+	 * Called right when {@link PantheonConfig#twoHandSlotMode} transitions
+	 * from off to on. Two-hand mode blanks every hotbar slot but the center
+	 * one ({@link HotbarOwnersPayload#TWO_HAND_ACTIVE_SLOT}) and locks them
+	 * against further interaction ({@link com.pantheon.mixin.HotbarLockMixin}),
+	 * but that's purely a UI/interaction change - it doesn't touch whatever
+	 * items were already sitting in those slots. Since the whole 36-slot
+	 * inventory (hotbar included) is one shared list per team ({@link Team#items}),
+	 * left alone those items would just sit there inert and unreachable for
+	 * as long as the mode stays on. Move each one into the first free slot
+	 * of that same team's 27-slot main inventory instead, or drop it near an
+	 * online member if the main inventory is completely full.
+	 *
+	 * <p>Mirrors {@link com.pantheon.EquipmentSharingTransfer#migrateSharedToLocal}'s
+	 * exact same fallback for the one case neither can resolve: a full
+	 * inventory with nobody on the team online to drop the item near. That
+	 * leaves the item sitting in its now-blanked, now-locked slot rather
+	 * than losing it outright - inert until either two-hand mode is turned
+	 * back off (restoring normal access to every slot) or someone logs in
+	 * and this is run again for a later on/off/on transition.
+	 */
+	public static void migrateBlankedSlotsOnEnable(final MinecraftServer server) {
+		for (Team team : TeamManager.allTeams()) {
+			// Computed at most once per team, and only if some slot actually
+			// needs the drop fallback - not once per blanked slot that needs
+			// it, which would re-scan every online player up to 8 times over
+			// for a team with several stranded items and a full inventory.
+			List<ServerPlayer> members = null;
+			for (int slot = 0; slot < HotbarOwnersPayload.SLOT_COUNT; slot++) {
+				if (slot == HotbarOwnersPayload.TWO_HAND_ACTIVE_SLOT) {
+					continue;
+				}
+				ItemStack stack = team.items.get(slot);
+				if (stack.isEmpty()) {
+					continue;
+				}
+
+				boolean placed = false;
+				for (int i = HotbarOwnersPayload.SLOT_COUNT; i < team.items.size(); i++) {
+					if (team.items.get(i).isEmpty()) {
+						team.items.set(i, stack);
+						team.items.set(slot, ItemStack.EMPTY);
+						placed = true;
+						break;
+					}
+				}
+				if (placed) {
+					PantheonMod.LOGGER.info("[HotbarOwnership] two-hand mode enabled on team '{}': moved blanked slot {}'s {} into the main inventory",
+						team.name, slot, stack);
+					continue;
+				}
+
+				if (members == null) {
+					members = TeamManager.onlineMembersOf(team, server);
+				}
+				if (members.isEmpty()) {
+					PantheonMod.LOGGER.warn("[HotbarOwnership] two-hand mode enabled on team '{}': main inventory is full and nobody is online - {} in blanked slot {} was left in place",
+						team.name, stack, slot);
+					continue;
+				}
+				team.items.set(slot, ItemStack.EMPTY);
+				members.get(0).spawnAtLocation((ServerLevel) members.get(0).level(), stack);
+				PantheonMod.LOGGER.info("[HotbarOwnership] two-hand mode enabled on team '{}': main inventory is full, dropped blanked slot {}'s {} near {}",
+					team.name, slot, stack, members.get(0).getGameProfile().name());
 			}
 		}
 	}

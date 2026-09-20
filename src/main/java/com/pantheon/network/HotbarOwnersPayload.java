@@ -17,8 +17,8 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
  * {@link #SLOT_COUNT} entries, one per hotbar slot; an owner equal to
  * {@link #NO_OWNER} means that slot currently has no player locked to it.
  * Each owner's frame color is computed client-side from their UUID (see
- * {@code com.pantheon.client.HotbarColors}), matching the vanilla locator bar
- * exactly, so it never needs to be sent over the wire.
+ * {@code com.pantheon.client.HotbarColors}), so it never needs to be sent
+ * over the wire.
  */
 public record HotbarOwnersPayload(List<UUID> owners) implements CustomPacketPayload {
 	public static final int SLOT_COUNT = 9;
