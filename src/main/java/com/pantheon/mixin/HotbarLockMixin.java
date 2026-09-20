@@ -53,7 +53,10 @@ import net.minecraft.world.item.ItemStack;
  * ownership to arbitrate when only one slot is ever selectable to begin
  * with, so without this the eight slots {@link com.pantheon.client.TwoHandHotbarOverlay}
  * and {@code HotbarLockFrameMixin} merely hide from view would otherwise
- * stay fully clickable dead storage.
+ * stay fully clickable dead storage. The actual "is this slot off-limits"
+ * rule lives in {@link HotbarOwnership#isLocked}, shared with
+ * {@link HotbarPickItemLockMixin} for the one vanilla path ("pick block")
+ * that writes into a hotbar slot without ever calling {@code clicked}.
  */
 @Mixin(AbstractContainerMenu.class)
 public abstract class HotbarLockMixin {
@@ -93,8 +96,8 @@ public abstract class HotbarLockMixin {
 		List<UUID> owners = config.enableHotbarOwnership ? HotbarOwnership.currentOwnersFor(serverPlayer) : null;
 
 		int hoveredHotbarSlot = this.pantheon$hotbarIndexOf(slotId, serverPlayer);
-		boolean touchesLockedSlotDirectly = this.pantheon$isLocked(hoveredHotbarSlot, owners, serverPlayer, config)
-			|| (input == ContainerInput.SWAP && this.pantheon$isLocked(button, owners, serverPlayer, config));
+		boolean touchesLockedSlotDirectly = HotbarOwnership.isLocked(hoveredHotbarSlot, owners, serverPlayer, config)
+			|| (input == ContainerInput.SWAP && HotbarOwnership.isLocked(button, owners, serverPlayer, config));
 
 		if (touchesLockedSlotDirectly) {
 			ci.cancel();
@@ -124,7 +127,7 @@ public abstract class HotbarLockMixin {
 
 		boolean violated = false;
 		for (int i = 0; i < before.length; i++) {
-			if (this.pantheon$isLocked(i, owners, serverPlayer, config) && !ItemStack.matches(before[i], team.items.get(i))) {
+			if (HotbarOwnership.isLocked(i, owners, serverPlayer, config) && !ItemStack.matches(before[i], team.items.get(i))) {
 				violated = true;
 				break;
 			}
@@ -153,24 +156,5 @@ public abstract class HotbarLockMixin {
 		}
 		int index = slot.getContainerSlot();
 		return (index >= 0 && index < HotbarOwnersPayload.SLOT_COUNT) ? index : -1;
-	}
-
-	/**
-	 * Whether {@code hotbarIndex} is off-limits to {@code player} right now.
-	 * {@code owners} is {@code null} under two-hand mode (both call sites
-	 * above only compute it when {@link PantheonConfig#enableHotbarOwnership}
-	 * is on), which is the signal to use its everyone-but-the-active-slot
-	 * rule instead of per-player ownership.
-	 */
-	@Unique
-	private boolean pantheon$isLocked(final int hotbarIndex, final List<UUID> owners, final ServerPlayer player, final PantheonConfig config) {
-		if (hotbarIndex < 0 || hotbarIndex >= HotbarOwnersPayload.SLOT_COUNT) {
-			return false;
-		}
-		if (owners == null) {
-			return config.twoHandSlotMode && hotbarIndex != HotbarOwnersPayload.TWO_HAND_ACTIVE_SLOT;
-		}
-		UUID owner = owners.get(hotbarIndex);
-		return !owner.equals(HotbarOwnersPayload.NO_OWNER) && !owner.equals(player.getUUID());
 	}
 }

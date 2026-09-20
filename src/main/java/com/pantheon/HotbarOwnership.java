@@ -303,6 +303,28 @@ public final class HotbarOwnership {
 	}
 
 	/**
+	 * Whether {@code hotbarIndex} is off-limits to {@code player} right now -
+	 * the single source of truth for both {@link com.pantheon.mixin.HotbarLockMixin}
+	 * (guarding the normal click-a-slot path) and
+	 * {@link com.pantheon.mixin.HotbarPickItemLockMixin} (guarding "pick
+	 * block", which writes straight into a hotbar slot without ever going
+	 * through a click). {@code owners} is {@code null} under two-hand mode -
+	 * both call sites only compute it when {@link PantheonConfig#enableHotbarOwnership}
+	 * is on - which is the signal to use its everyone-but-the-active-slot
+	 * rule instead of per-player ownership.
+	 */
+	public static boolean isLocked(final int hotbarIndex, final List<UUID> owners, final ServerPlayer player, final PantheonConfig config) {
+		if (hotbarIndex < 0 || hotbarIndex >= HotbarOwnersPayload.SLOT_COUNT) {
+			return false;
+		}
+		if (owners == null) {
+			return config.twoHandSlotMode && hotbarIndex != HotbarOwnersPayload.TWO_HAND_ACTIVE_SLOT;
+		}
+		UUID owner = owners.get(hotbarIndex);
+		return !owner.equals(HotbarOwnersPayload.NO_OWNER) && !owner.equals(player.getUUID());
+	}
+
+	/**
 	 * Recomputes ownership per online team and, only for teams where it
 	 * changed since the last check, pushes it to that team's clients. Takes
 	 * the online-players-by-team grouping already computed by the caller
