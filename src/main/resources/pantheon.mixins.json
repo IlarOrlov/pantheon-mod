@@ -5,14 +5,16 @@
 	"mixins": [
 		"InventorySharingMixin",
 		"EquipmentSharingMixin",
+		"DeathDropPickupSaveMixin",
+		"HotbarCreativeSlotLockMixin",
+		"HotbarInventoryLockMixin",
 		"HotbarLockMixin",
 		"HotbarOwnershipCapMixin",
 		"HotbarPickItemLockMixin",
 		"HotbarRespawnMixin",
 		"HotbarSelectionCapMixin",
+		"HotbarSlotLockMixin",
 		"SharedHungerWasteMixin",
-		"TwoHandAutoSlotMixin",
-		"TwoHandSlotMayPlaceMixin",
 		"UnsharedEquipmentDeathDropMixin"
 	],
 	"injectors": {

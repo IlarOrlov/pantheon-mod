@@ -25,7 +25,7 @@ public final class PantheonCommands {
 	}
 
 	private static final SuggestionProvider<CommandSourceStack> SETTING_NAMES = (context, builder) -> {
-		for (String name : new String[] {"syncArmor", "syncOffhand", "enableHotbarOwnership", "syncHealth", "syncHunger", "syncExperience", "syncEffects", "teamsEnabled", "crudeHumor", "twoHandSlotMode"}) {
+		for (String name : new String[] {"syncArmor", "syncOffhand", "enableHotbarOwnership", "syncHealth", "syncHunger", "syncExperience", "syncEffects", "teamsEnabled", "crudeHumor", "twoHandSlotMode", "locationMarks", "locationMarkLifetime"}) {
 			builder.suggest(name);
 		}
 		return builder.buildFuture();
@@ -94,6 +94,8 @@ public final class PantheonCommands {
 				+ ", teamsEnabled=" + config.teamsEnabled
 				+ ", crudeHumor=" + config.crudeHumor
 				+ ", twoHandSlotMode=" + config.twoHandSlotMode
+				+ ", locationMarks=" + config.locationMarks
+				+ ", locationMarkLifetime=" + config.locationMarkLifetimeSeconds + "s"
 		), false);
 		return 1;
 	}
@@ -104,6 +106,9 @@ public final class PantheonCommands {
 		CommandSourceStack source = context.getSource();
 
 		PantheonConfig config = PantheonConfig.get().copy();
+		if ("locationMarkLifetime".equals(setting)) {
+			return setLocationMarkLifetime(source, config, value);
+		}
 		try {
 			switch (setting) {
 				case "syncArmor" -> config.syncArmor = Boolean.parseBoolean(value);
@@ -116,6 +121,7 @@ public final class PantheonCommands {
 				case "teamsEnabled" -> config.teamsEnabled = Boolean.parseBoolean(value);
 				case "crudeHumor" -> config.crudeHumor = Boolean.parseBoolean(value);
 				case "twoHandSlotMode" -> config.twoHandSlotMode = Boolean.parseBoolean(value);
+				case "locationMarks" -> config.locationMarks = Boolean.parseBoolean(value);
 				default -> {
 					source.sendFailure(Component.literal("Unknown setting: " + setting));
 					return 0;
@@ -163,6 +169,22 @@ public final class PantheonCommands {
 		return 1;
 	}
 
+	/** The one non-boolean setting: how long a location mark stays up, in seconds, clamped to the same range the settings screen's slider offers. */
+	private static int setLocationMarkLifetime(final CommandSourceStack source, final PantheonConfig config, final String value) {
+		int seconds;
+		try {
+			seconds = Integer.parseInt(value);
+		} catch (NumberFormatException e) {
+			source.sendFailure(Component.literal("locationMarkLifetime takes a number of seconds ("
+				+ PantheonConfig.LOCATION_MARK_LIFETIME_MIN_SECONDS + "-" + PantheonConfig.LOCATION_MARK_LIFETIME_MAX_SECONDS + "), not: " + value));
+			return 0;
+		}
+		config.locationMarkLifetimeSeconds = seconds;
+		PantheonConfig updated = PantheonNetworking.applyConfigChange(source.getServer(), config);
+		source.sendSuccess(() -> Component.literal("locationMarkLifetime = " + updated.locationMarkLifetimeSeconds + "s"), true);
+		return 1;
+	}
+
 	/** The actual current value of one of {@link #SETTING_NAMES}' boolean settings - used to report what a {@code /pantheon config} change truly resulted in, since {@link PantheonConfig#normalize()} can override what was directly requested. */
 	private static boolean currentValue(final PantheonConfig config, final String setting) {
 		return switch (setting) {
@@ -176,6 +198,7 @@ public final class PantheonCommands {
 			case "teamsEnabled" -> config.teamsEnabled;
 			case "crudeHumor" -> config.crudeHumor;
 			case "twoHandSlotMode" -> config.twoHandSlotMode;
+			case "locationMarks" -> config.locationMarks;
 			default -> false;
 		};
 	}

@@ -1,5 +1,6 @@
 {
 	"key.category.pantheon.main": "Pantheon Mod",
 	"key.pantheon.open_settings": "Open Pantheon Settings",
-	"key.pantheon.request_slot": "Request Hovered Slot"
+	"key.pantheon.request_slot": "Request Hovered Slot",
+	"key.pantheon.place_location_mark": "Place Location Mark"
 }

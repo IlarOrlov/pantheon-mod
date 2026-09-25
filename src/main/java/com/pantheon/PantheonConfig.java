@@ -27,6 +27,11 @@ public final class PantheonConfig {
 	/** Slots on the server are capped at this many once hotbar ownership is enabled. */
 	public static final int HOTBAR_OWNERSHIP_PLAYER_CAP = 9;
 
+	/** Range (and step) of {@link #locationMarkLifetimeSeconds} - what the settings slider offers, and what anything else gets clamped to. */
+	public static final int LOCATION_MARK_LIFETIME_MIN_SECONDS = 5;
+	public static final int LOCATION_MARK_LIFETIME_MAX_SECONDS = 300;
+	public static final int LOCATION_MARK_LIFETIME_STEP_SECONDS = 5;
+
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
 	private static volatile PantheonConfig instance = new PantheonConfig();
@@ -62,6 +67,10 @@ public final class PantheonConfig {
 	 * not something any UI/command directly sets.
 	 */
 	public boolean hotbarOwnershipBeforeTwoHand = true;
+	/** When on, players can middle-click to place a location mark every teammate sees, in the placer's color. */
+	public boolean locationMarks = true;
+	/** How long a location mark stays up before disappearing, in seconds. */
+	public int locationMarkLifetimeSeconds = 30;
 
 	public static PantheonConfig get() {
 		return instance;
@@ -80,6 +89,13 @@ public final class PantheonConfig {
 		if (this.twoHandSlotMode) {
 			this.enableHotbarOwnership = false;
 		}
+		this.locationMarkLifetimeSeconds = clampLocationMarkLifetime(this.locationMarkLifetimeSeconds);
+	}
+
+	/** Clamps to the slider's range and snaps to its step, so the command and a hand-edited config file can't produce a value the slider couldn't. */
+	public static int clampLocationMarkLifetime(final int seconds) {
+		int clamped = Math.max(LOCATION_MARK_LIFETIME_MIN_SECONDS, Math.min(LOCATION_MARK_LIFETIME_MAX_SECONDS, seconds));
+		return Math.round((float) clamped / LOCATION_MARK_LIFETIME_STEP_SECONDS) * LOCATION_MARK_LIFETIME_STEP_SECONDS;
 	}
 
 	/**
@@ -193,6 +209,8 @@ public final class PantheonConfig {
 		copy.crudeHumor = this.crudeHumor;
 		copy.twoHandSlotMode = this.twoHandSlotMode;
 		copy.hotbarOwnershipBeforeTwoHand = this.hotbarOwnershipBeforeTwoHand;
+		copy.locationMarks = this.locationMarks;
+		copy.locationMarkLifetimeSeconds = this.locationMarkLifetimeSeconds;
 		return copy;
 	}
 
@@ -207,6 +225,8 @@ public final class PantheonConfig {
 			+ ", teamsEnabled=" + config.teamsEnabled
 			+ ", crudeHumor=" + config.crudeHumor
 			+ ", twoHandSlotMode=" + config.twoHandSlotMode
-			+ ", hotbarOwnershipBeforeTwoHand=" + config.hotbarOwnershipBeforeTwoHand;
+			+ ", hotbarOwnershipBeforeTwoHand=" + config.hotbarOwnershipBeforeTwoHand
+			+ ", locationMarks=" + config.locationMarks
+			+ ", locationMarkLifetimeSeconds=" + config.locationMarkLifetimeSeconds;
 	}
 }

@@ -5,6 +5,7 @@ import java.util.function.Consumer;
 import com.pantheon.PantheonConfig;
 
 import net.minecraft.ChatFormatting;
+import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.components.ScrollableLayout;
@@ -100,6 +101,11 @@ public final class PantheonOptionsScreen extends Screen {
 		content.addChild(toggleRow("Split into teams", this.working.teamsEnabled, v -> this.working.teamsEnabled = v));
 
 		content.addChild(spacer());
+		content.addChild(sectionLabel("Location marks"));
+		content.addChild(toggleRow("Location marks", this.working.locationMarks, v -> this.working.locationMarks = v));
+		content.addChild(new LifetimeSlider());
+
+		content.addChild(spacer());
 		content.addChild(sectionLabel("Jokes"));
 		content.addChild(toggleRow("Crude jokes",
 			this.working.crudeHumor, v -> this.working.crudeHumor = v));
@@ -143,6 +149,32 @@ public final class PantheonOptionsScreen extends Screen {
 	private CycleButton<Boolean> toggleRow(final String label, final boolean initial, final Consumer<Boolean> onChange) {
 		return CycleButton.onOffBuilder(initial)
 			.create(0, 0, ROW_WIDTH, 20, Component.literal(label), (button, value) -> onChange.accept(value));
+	}
+
+	/** "Location mark life time", in {@link PantheonConfig#LOCATION_MARK_LIFETIME_STEP_SECONDS}-second steps. */
+	private final class LifetimeSlider extends AbstractSliderButton {
+		private static final int MIN = PantheonConfig.LOCATION_MARK_LIFETIME_MIN_SECONDS;
+		private static final int MAX = PantheonConfig.LOCATION_MARK_LIFETIME_MAX_SECONDS;
+
+		LifetimeSlider() {
+			super(0, 0, ROW_WIDTH, 20, Component.empty(),
+				(double) (PantheonOptionsScreen.this.working.locationMarkLifetimeSeconds - MIN) / (MAX - MIN));
+			this.updateMessage();
+		}
+
+		private int seconds() {
+			return PantheonConfig.clampLocationMarkLifetime((int) Math.round(MIN + this.value * (MAX - MIN)));
+		}
+
+		@Override
+		protected void updateMessage() {
+			this.setMessage(Component.literal("Location mark life time: " + this.seconds() + "s"));
+		}
+
+		@Override
+		protected void applyValue() {
+			PantheonOptionsScreen.this.working.locationMarkLifetimeSeconds = this.seconds();
+		}
 	}
 
 	@Override

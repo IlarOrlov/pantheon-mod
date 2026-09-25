@@ -15,6 +15,7 @@ import com.pantheon.PantheonConfig;
 import com.pantheon.Team;
 import com.pantheon.TeamManager;
 
+import net.minecraft.network.protocol.game.ClientboundSetHeldSlotPacket;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import net.minecraft.world.item.ItemStack;
@@ -46,6 +47,9 @@ public abstract class HotbarPickItemLockMixin {
 	private ItemStack[] pantheon$before;
 
 	@Unique
+	private List<UUID> pantheon$beforeOwners;
+
+	@Unique
 	private int pantheon$beforeSelectedSlot;
 
 	@Inject(method = "tryPickItem", at = @At("HEAD"))
@@ -67,6 +71,10 @@ public abstract class HotbarPickItemLockMixin {
 			snapshot[i] = team.items.get(i).copy();
 		}
 		this.pantheon$before = snapshot;
+		// Ownership as it stood before the pick: afterwards, a player who
+		// just moved onto someone else's slot would turn it into a tie -
+		// "unowned" - and hide the very violation being checked for.
+		this.pantheon$beforeOwners = config.enableHotbarOwnership ? HotbarOwnership.currentOwnersFor(this.player) : null;
 		this.pantheon$beforeSelectedSlot = this.player.getInventory().getSelectedSlot();
 	}
 
@@ -79,14 +87,16 @@ public abstract class HotbarPickItemLockMixin {
 		}
 
 		PantheonConfig config = PantheonConfig.get();
-		List<UUID> owners = config.enableHotbarOwnership ? HotbarOwnership.currentOwnersFor(this.player) : null;
+		List<UUID> owners = this.pantheon$beforeOwners;
 		Team team = TeamManager.teamOf(this.player);
 
-		boolean violated = false;
-		for (int i = 0; i < before.length; i++) {
+		// Pick block on a hotbar item just selects that slot - no item moves
+		// at all - so landing on someone else's owned slot has to be caught
+		// by the selection itself, not by comparing contents.
+		boolean violated = HotbarOwnership.isLocked(this.player.getInventory().getSelectedSlot(), owners, this.player, config);
+		for (int i = 0; i < before.length && !violated; i++) {
 			if (HotbarOwnership.isLocked(i, owners, this.player, config) && !ItemStack.matches(before[i], team.items.get(i))) {
 				violated = true;
-				break;
 			}
 		}
 
@@ -98,6 +108,8 @@ public abstract class HotbarPickItemLockMixin {
 			team.items.set(i, before[i]);
 		}
 		this.player.getInventory().setSelectedSlot(this.pantheon$beforeSelectedSlot);
+		// Vanilla already told the client about the new selection.
+		this.player.connection.send(new ClientboundSetHeldSlotPacket(this.pantheon$beforeSelectedSlot));
 		this.player.inventoryMenu.broadcastFullState();
 	}
 }

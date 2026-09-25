@@ -247,7 +247,7 @@ public final class SharedStats {
 		for (int i = 0; i < team.items.size(); i++) {
 			ItemStack stack = team.items.get(i);
 			if (!stack.isEmpty()) {
-				anchor.spawnAtLocation(level, stack);
+				DeathDropSaves.tagDeathDrop(anchor.spawnAtLocation(level, stack));
 				team.items.set(i, ItemStack.EMPTY);
 			}
 		}
@@ -258,7 +258,7 @@ public final class SharedStats {
 			}
 			ItemStack stack = team.equipment.get(slot);
 			if (stack != null && !stack.isEmpty()) {
-				anchor.spawnAtLocation(level, stack);
+				DeathDropSaves.tagDeathDrop(anchor.spawnAtLocation(level, stack));
 				team.equipment.put(slot, ItemStack.EMPTY);
 			}
 		}

@@ -6,6 +6,7 @@ import java.util.Map;
 import com.pantheon.network.PantheonNetworking;
 
 import net.fabricmc.api.ModInitializer;
+import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
@@ -13,6 +14,7 @@ import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.gamerules.GameRules;
 
@@ -38,6 +40,9 @@ public class PantheonMod implements ModInitializer {
 		PantheonCommands.register();
 
 		ServerLifecycleEvents.SERVER_STARTING.register(server -> {
+			DeathDropSaves.reset();
+			PantheonNetworking.clearHeldOverlays();
+			LocationMarks.clear();
 			TeamManager.load(server);
 			// A death that drops/clears the shared inventory would empty it for every
 			// player at once, not just the one who died - keepInventory is required.
@@ -55,6 +60,15 @@ public class PantheonMod implements ModInitializer {
 		// file - make sure they go out with every world save (autosave, pause, stop).
 		ServerLifecycleEvents.BEFORE_SAVE.register((server, flush, force) -> TeamManager.markDirty(server));
 
+		// A death moves items out of the shared inventory (saved data) onto the
+		// ground (chunk data) - save both together so a crash can't bring back
+		// one side without the other. See DeathDropSaves.
+		ServerLivingEntityEvents.AFTER_DEATH.register((entity, damageSource) -> {
+			if (entity instanceof ServerPlayer player) {
+				DeathDropSaves.onPlayerDeath(((ServerLevel) player.level()).getServer());
+			}
+		});
+
 		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
 			PantheonNetworking.sendConfigTo(handler.player);
 			// The joining player's own hotbar selection is loaded from their personal
@@ -66,6 +80,7 @@ public class PantheonMod implements ModInitializer {
 			// force it immediately so they see the current shared contents right away.
 			handler.player.inventoryMenu.broadcastFullState();
 			HotbarOwnership.broadcast(server);
+			LocationMarks.sendActiveTo(server, handler.player);
 		});
 		ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> HotbarOwnership.broadcast(server));
 
@@ -94,6 +109,8 @@ public class PantheonMod implements ModInitializer {
 			if (this.tickCounter % RESYNC_INTERVAL_TICKS == 0) {
 				HotbarOwnership.broadcast(onlineByTeam);
 			}
+			PantheonNetworking.tickHeldOverlays(server);
+			DeathDropSaves.tick(server);
 		});
 	}
 

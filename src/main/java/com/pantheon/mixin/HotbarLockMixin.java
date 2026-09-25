@@ -11,8 +11,11 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.pantheon.HotbarOwnership;
 import com.pantheon.PantheonConfig;
+import com.pantheon.SlotLocks;
 import com.pantheon.Team;
 import com.pantheon.TeamManager;
 import com.pantheon.network.HotbarOwnersPayload;
@@ -26,7 +29,7 @@ import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 
 /**
- * Keeps a hotbar slot untouchable by whoever it's locked against, in two
+ * Keeps a hotbar slot untouchable by whoever it's locked against, in three
  * layers:
  *
  * <ol>
@@ -35,16 +38,22 @@ import net.minecraft.world.item.ItemStack;
  *   whole click is cancelled before vanilla does anything. This has to
  *   happen <em>before</em>, not after: dropping spawns an item entity in the
  *   world and swap-hands writes into the offhand slot, neither of which a
- *   same-tick revert could undo without leaving a duplicated item behind.</li>
- *   <li>As a backstop for indirect landings vanilla picks internally - e.g.
- *   shift-clicking a stack in from a chest, where the destination hotbar
- *   slot isn't a parameter we can check up front - the <em>entire</em>
- *   36-slot shared inventory and the cursor are snapshotted before the
- *   click and restored if a locked slot ends up changed anyway. The whole
- *   inventory, not just the 9 hotbar slots, because a shift-click's source
- *   is just as often the other 27 slots - restoring only the destination
- *   after vanilla already emptied the source would lose the item outright,
- *   not just misplace it.</li>
+ *   same-tick revert could undo without leaving a duplicated item behind.
+ *   Runs on both sides ({@link SlotLocks}) so the client's own prediction
+ *   agrees with the server's verdict.</li>
+ *   <li>Shift-click ({@code moveItemStackTo}) sees a locked slot as empty,
+ *   and {@code HotbarSlotLockMixin} makes it refuse placement - so a
+ *   shift-clicked stack (from a chest, a crafting result, a furnace) skips
+ *   straight past someone else's slot, even one holding a matching stack it
+ *   could otherwise have merged into, to the next slot that's actually
+ *   yours to fill.</li>
+ *   <li>As a last-resort backstop, <em>every</em> slot in the open menu -
+ *   chest, crafting grid and result included, not just the shared
+ *   inventory - plus the cursor are snapshotted before the click and all
+ *   restored if a locked slot ends up changed anyway. Restoring only the
+ *   player's own inventory (as this used to) after vanilla had already
+ *   taken the item out of the chest or crafting result is exactly how items
+ *   used to vanish.</li>
  * </ol>
  *
  * <p>What counts as "locked" depends on which of two mutually-exclusive
@@ -53,14 +62,7 @@ import net.minecraft.world.item.ItemStack;
  * except whichever online teammate currently owns it ({@link HotbarOwnership});
  * with {@link PantheonConfig#twoHandSlotMode}, every slot but the one active
  * slot ({@link HotbarOwnersPayload#TWO_HAND_ACTIVE_SLOT}) is locked to
- * <em>everyone</em>, including its own "owner" - there's no per-player
- * ownership to arbitrate when only one slot is ever selectable to begin
- * with, so without this the eight slots {@link com.pantheon.client.TwoHandHotbarOverlay}
- * and {@code HotbarLockFrameMixin} merely hide from view would otherwise
- * stay fully clickable dead storage. The actual "is this slot off-limits"
- * rule lives in {@link HotbarOwnership#isLocked}, shared with
- * {@link HotbarPickItemLockMixin} for the one vanilla path ("pick block")
- * that writes into a hotbar slot without ever calling {@code clicked}.
+ * <em>everyone</em>. The actual rule lives in {@link HotbarOwnership#isLocked}.
  */
 @Mixin(AbstractContainerMenu.class)
 public abstract class HotbarLockMixin {
@@ -81,30 +83,31 @@ public abstract class HotbarLockMixin {
 	private ItemStack[] pantheon$before;
 
 	@Unique
+	private ItemStack[] pantheon$beforeSlots;
+
+	@Unique
 	private ItemStack pantheon$beforeCarried;
 
 	@Inject(method = "clicked", at = @At("HEAD"), cancellable = true)
 	private void pantheon$capture(final int slotId, final int button, final ContainerInput input, final Player player, final CallbackInfo ci) {
 		this.pantheon$before = null;
+		this.pantheon$beforeSlots = null;
 
-		if (!(player instanceof ServerPlayer serverPlayer)) {
+		boolean[] locked = SlotLocks.lockedMask(player);
+		if (locked == null) {
 			return;
 		}
-		PantheonConfig config = PantheonConfig.get();
-		if (!config.enableHotbarOwnership && !config.twoHandSlotMode) {
-			return;
-		}
 
-		// Only meaningful (non-null) under per-slot ownership - two-hand mode
-		// locks every non-active slot outright, with no owner to look up.
-		List<UUID> owners = config.enableHotbarOwnership ? HotbarOwnership.currentOwnersFor(serverPlayer) : null;
-
-		int hoveredHotbarSlot = this.pantheon$hotbarIndexOf(slotId, serverPlayer);
-		boolean touchesLockedSlotDirectly = HotbarOwnership.isLocked(hoveredHotbarSlot, owners, serverPlayer, config)
-			|| (input == ContainerInput.SWAP && HotbarOwnership.isLocked(button, owners, serverPlayer, config));
+		int hoveredHotbarSlot = this.pantheon$hotbarIndexOf(slotId, player);
+		boolean touchesLockedSlotDirectly = SlotLocks.isLocked(locked, hoveredHotbarSlot)
+			|| (input == ContainerInput.SWAP && SlotLocks.isLocked(locked, button));
 
 		if (touchesLockedSlotDirectly) {
 			ci.cancel();
+			return;
+		}
+
+		if (!(player instanceof ServerPlayer serverPlayer)) {
 			return;
 		}
 
@@ -113,15 +116,22 @@ public abstract class HotbarLockMixin {
 		for (int i = 0; i < snapshot.length; i++) {
 			snapshot[i] = team.items.get(i).copy();
 		}
+		ItemStack[] slotSnapshot = new ItemStack[this.slots.size()];
+		for (int i = 0; i < slotSnapshot.length; i++) {
+			slotSnapshot[i] = this.slots.get(i).getItem().copy();
+		}
 		this.pantheon$before = snapshot;
+		this.pantheon$beforeSlots = slotSnapshot;
 		this.pantheon$beforeCarried = this.getCarried().copy();
 	}
 
 	@Inject(method = "clicked", at = @At("RETURN"))
 	private void pantheon$revert(final int slotId, final int button, final ContainerInput input, final Player player, final CallbackInfo ci) {
 		ItemStack[] before = this.pantheon$before;
+		ItemStack[] beforeSlots = this.pantheon$beforeSlots;
 		this.pantheon$before = null;
-		if (before == null || !(player instanceof ServerPlayer serverPlayer)) {
+		this.pantheon$beforeSlots = null;
+		if (before == null || beforeSlots == null || !(player instanceof ServerPlayer serverPlayer)) {
 			return;
 		}
 
@@ -144,13 +154,41 @@ public abstract class HotbarLockMixin {
 		for (int i = 0; i < before.length; i++) {
 			team.items.set(i, before[i]);
 		}
+		// Everything outside the shared inventory the click could have taken
+		// from - chest, crafting grid/result, furnace, ... Inventory-backed
+		// slots were already restored above through team.items.
+		for (int i = 0; i < beforeSlots.length && i < this.slots.size(); i++) {
+			Slot slot = this.slots.get(i);
+			if (slot.container == serverPlayer.getInventory()) {
+				continue;
+			}
+			if (!ItemStack.matches(beforeSlots[i], slot.getItem())) {
+				slot.set(beforeSlots[i]);
+			}
+		}
 		this.setCarried(this.pantheon$beforeCarried);
 		this.broadcastFullState();
 	}
 
+	/**
+	 * Shift-click's merge pass only ever checks "same item, room left" - never
+	 * {@code Slot#mayPlace} - so without this a stack shift-clicked out of a
+	 * chest would top up the matching stack in someone else's owned slot.
+	 * Reporting a locked slot as empty skips the merge, and the fill pass's
+	 * own {@code mayPlace} check (see {@code HotbarSlotLockMixin}) then
+	 * refuses it as a destination too.
+	 */
+	@WrapOperation(method = "moveItemStackTo", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/inventory/Slot;getItem()Lnet/minecraft/world/item/ItemStack;"))
+	private ItemStack pantheon$hideLockedSlot(final Slot slot, final Operation<ItemStack> original) {
+		if (SlotLocks.isLocked(slot)) {
+			return ItemStack.EMPTY;
+		}
+		return original.call(slot);
+	}
+
 	/** Maps a menu-local slot id to the shared hotbar index (0-8) it refers to, or -1 if it isn't one. */
 	@Unique
-	private int pantheon$hotbarIndexOf(final int slotId, final ServerPlayer player) {
+	private int pantheon$hotbarIndexOf(final int slotId, final Player player) {
 		if (slotId < 0 || slotId >= this.slots.size()) {
 			return -1;
 		}

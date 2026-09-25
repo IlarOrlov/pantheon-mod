@@ -7,10 +7,12 @@ import java.util.UUID;
 
 import com.pantheon.PantheonConfig;
 import com.pantheon.PantheonMod;
+import com.pantheon.SlotLocks;
 import com.pantheon.client.mixin.ContainerScreenHoveredSlotAccessor;
 import com.pantheon.client.mixin.KeyMappingKeyAccessor;
 import com.pantheon.network.ForceHotbarSlotPayload;
 import com.pantheon.network.HotbarOwnersPayload;
+import com.pantheon.network.LocationMarkPayload;
 import com.pantheon.network.RequestSlotPayload;
 import com.pantheon.network.SyncConfigPayload;
 import com.pantheon.network.UpdateConfigPayload;
@@ -18,6 +20,7 @@ import com.pantheon.network.UpdateConfigPayload;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements;
@@ -28,6 +31,7 @@ import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.Slot;
 
 import org.lwjgl.sdl.SDLMouse;
@@ -44,11 +48,25 @@ public class PantheonModClient implements ClientModInitializer {
 
 	private static KeyMapping openSettingsKey;
 	private static KeyMapping requestSlotKey;
+	private static KeyMapping placeLocationMarkKey;
 	private static boolean requestSlotKeyWasPhysicallyDown;
 
 	@Override
 	public void onInitializeClient() {
 		PantheonClientConfig.load();
+
+		// Lets shared code (Slot#mayPlace/#mayPickup, shift-click, the raw
+		// Inventory scans) predict locks on this side exactly like the server
+		// enforces them - see SlotLocks.
+		SlotLocks.clientPredicate = PantheonModClient::isLockedForLocalPlayer;
+		// Ownership and settings belong to the server we were on - a vanilla
+		// server joined next must not inherit its locks.
+		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
+			hotbarOwners = emptyOwners();
+			hotbarColors = Map.of();
+			lastKnownConfig = new PantheonConfig();
+			LocationMarkClient.clear();
+		});
 
 		ClientPlayNetworking.registerGlobalReceiver(HotbarOwnersPayload.TYPE, (payload, context) -> {
 			hotbarOwners = payload.owners();
@@ -68,10 +86,12 @@ public class PantheonModClient implements ClientModInitializer {
 				context.player().getInventory().setSelectedSlot(payload.slot());
 			}
 		});
+		ClientPlayNetworking.registerGlobalReceiver(LocationMarkPayload.TYPE, (payload, context) -> LocationMarkClient.onMarkPayload(payload));
 
 		HudElementRegistry.attachElementAfter(VanillaHudElements.HOTBAR, PantheonMod.id("hotbar_owners"), new HotbarOwnerOverlay());
 		HudElementRegistry.attachElementAfter(VanillaHudElements.HOTBAR, PantheonMod.id("low_health_warning"), new LowHealthOverlay());
 		HudElementRegistry.attachElementAfter(VanillaHudElements.HOTBAR, PantheonMod.id("two_hand_hotbar"), new TwoHandHotbarOverlay());
+		HudElementRegistry.attachElementBefore(VanillaHudElements.CROSSHAIR, PantheonMod.id("location_marks"), new LocationMarkOverlay());
 
 		KeyMapping.Category category = KeyMapping.Category.register(PantheonMod.id("main"));
 		openSettingsKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
@@ -87,6 +107,15 @@ public class PantheonModClient implements ClientModInitializer {
 			category
 		));
 
+		// Middle-click already places marks (see PickBlockLocationMarkMixin);
+		// this is for anyone who'd rather have a dedicated key that always does.
+		placeLocationMarkKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
+			"key.pantheon.place_location_mark",
+			InputConstants.Type.KEYBOARD,
+			InputConstants.UNKNOWN.getValue(),
+			category
+		));
+
 		ClientTickEvents.END_CLIENT_TICK.register(client -> {
 			while (openSettingsKey.consumeClick()) {
 				if (client.gui.screen() == null) {
@@ -95,6 +124,11 @@ public class PantheonModClient implements ClientModInitializer {
 			}
 			while (requestSlotKey.consumeClick()) {
 				requestHoveredSlot(client);
+			}
+			while (placeLocationMarkKey.consumeClick()) {
+				if (client.gui.screen() == null) {
+					LocationMarkClient.placeMark(client);
+				}
 			}
 			// Backstop for consumeClick(): some inventory screens can eat the raw
 			// key event before it reaches KeyMapping's own click-tracking, which
@@ -197,6 +231,25 @@ public class PantheonModClient implements ClientModInitializer {
 		}
 		UUID owner = hotbarOwners.get(slot);
 		return !owner.equals(HotbarOwnersPayload.NO_OWNER) && !owner.equals(minecraft.player.getUUID());
+	}
+
+	/**
+	 * {@link #isLockedToSomeoneElse} for {@link SlotLocks}: only the local
+	 * player's own inventory is ever locked on this side, and never the slot
+	 * we have selected ourselves - the server only ever locks a slot to us
+	 * when someone else holds it <em>alone</em>, so a stale broadcast still
+	 * crediting our own slot to someone else (the round trip right after a
+	 * move) mustn't lock us out of it.
+	 */
+	private static boolean isLockedForLocalPlayer(final Player player, final int slot) {
+		Minecraft minecraft = Minecraft.getInstance();
+		if (minecraft.player == null || player != minecraft.player) {
+			return false;
+		}
+		if (!lastKnownConfig.twoHandSlotMode && slot == player.getInventory().getSelectedSlot()) {
+			return false;
+		}
+		return isLockedToSomeoneElse(slot);
 	}
 
 	/**

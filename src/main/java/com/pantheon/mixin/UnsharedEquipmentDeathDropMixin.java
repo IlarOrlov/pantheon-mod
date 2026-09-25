@@ -5,6 +5,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
+import com.pantheon.DeathDropSaves;
 import com.pantheon.PantheonConfig;
 
 import net.minecraft.server.level.ServerLevel;
@@ -61,7 +62,7 @@ public abstract class UnsharedEquipmentDeathDropMixin {
 			ItemStack stack = player.getItemBySlot(slot);
 			if (!stack.isEmpty()) {
 				player.setItemSlot(slot, ItemStack.EMPTY);
-				player.spawnAtLocation(level, stack);
+				DeathDropSaves.tagDeathDrop(player.spawnAtLocation(level, stack));
 			}
 		}
 	}

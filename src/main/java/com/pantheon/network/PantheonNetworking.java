@@ -3,6 +3,7 @@ package com.pantheon.network;
 import com.pantheon.EquipmentSharingTransfer;
 import com.pantheon.FunnyMessages;
 import com.pantheon.HotbarOwnership;
+import com.pantheon.LocationMarks;
 import com.pantheon.PantheonConfig;
 import com.pantheon.PantheonMod;
 import com.pantheon.Team;
@@ -18,12 +19,28 @@ import net.minecraft.server.players.NameAndId;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 public final class PantheonNetworking {
-	/** Minimum gap between one player's slot-request pings, so it can't be spammed. */
-	private static final int PING_COOLDOWN_TICKS = 60;
+	/** Minimum gap between one player's slot-request pings - just enough that holding the key down can't machine-gun the sound. */
+	private static final int PING_COOLDOWN_TICKS = 10;
+
+	/** How long the pinged owner's request message stays on screen - well past vanilla's ~3s action bar, so it isn't missed mid-fight. */
+	private static final int PING_MESSAGE_TICKS = 160;
+
+	/** Vanilla keeps an action-bar message up this long before it fades; re-sent a bit sooner than that to keep it up without a flicker. */
+	private static final int OVERLAY_VANILLA_TICKS = 60;
+	private static final int OVERLAY_RESEND_TICKS = 40;
+
+	/** A pinged owner's request message, kept on screen by re-sending it until {@code untilTick}. */
+	private record HeldOverlay(Component message, long untilTick, long nextSendTick) {
+	}
+
+	private static final Map<UUID, HeldOverlay> HELD_OVERLAYS = new HashMap<>();
 
 	private PantheonNetworking() {
 	}
@@ -32,8 +49,10 @@ public final class PantheonNetworking {
 		PayloadTypeRegistry.clientboundPlay().register(HotbarOwnersPayload.TYPE, HotbarOwnersPayload.CODEC);
 		PayloadTypeRegistry.clientboundPlay().register(SyncConfigPayload.TYPE, SyncConfigPayload.CODEC);
 		PayloadTypeRegistry.clientboundPlay().register(ForceHotbarSlotPayload.TYPE, ForceHotbarSlotPayload.CODEC);
+		PayloadTypeRegistry.clientboundPlay().register(LocationMarkPayload.TYPE, LocationMarkPayload.CODEC);
 		PayloadTypeRegistry.serverboundPlay().register(UpdateConfigPayload.TYPE, UpdateConfigPayload.CODEC);
 		PayloadTypeRegistry.serverboundPlay().register(RequestSlotPayload.TYPE, RequestSlotPayload.CODEC);
+		PayloadTypeRegistry.serverboundPlay().register(PlaceLocationMarkPayload.TYPE, PlaceLocationMarkPayload.CODEC);
 
 		ServerPlayNetworking.registerGlobalReceiver(UpdateConfigPayload.TYPE, (payload, context) -> {
 			ServerPlayer player = context.player();
@@ -45,6 +64,12 @@ public final class PantheonNetworking {
 			ServerPlayer player = context.player();
 			MinecraftServer server = context.server();
 			server.execute(() -> handleRequestSlot(server, player, payload));
+		});
+
+		ServerPlayNetworking.registerGlobalReceiver(PlaceLocationMarkPayload.TYPE, (payload, context) -> {
+			ServerPlayer player = context.player();
+			MinecraftServer server = context.server();
+			server.execute(() -> LocationMarks.place(server, player, payload.pos()));
 		});
 	}
 
@@ -79,9 +104,49 @@ public final class PantheonNetworking {
 			return;
 		}
 
-		owner.sendOverlayMessage(FunnyMessages.randomSlotRequest(requester.getGameProfile().name()));
+		Component message = FunnyMessages.randomSlotRequest(requester.getGameProfile().name());
+		owner.sendOverlayMessage(message);
+		HELD_OVERLAYS.put(owner.getUUID(), new HeldOverlay(message, now + PING_MESSAGE_TICKS, now + OVERLAY_RESEND_TICKS));
 		playPingSound(owner);
 		requester.sendOverlayMessage(Component.literal("Poked " + owner.getGameProfile().name() + " about that slot."));
+	}
+
+	/**
+	 * Keeps each pinged owner's request message up for {@link #PING_MESSAGE_TICKS}
+	 * by re-sending it before vanilla's own action-bar timer runs out. Called
+	 * every server tick.
+	 */
+	public static void tickHeldOverlays(final MinecraftServer server) {
+		if (HELD_OVERLAYS.isEmpty()) {
+			return;
+		}
+		long now = server.getTickCount();
+		Iterator<Map.Entry<UUID, HeldOverlay>> it = HELD_OVERLAYS.entrySet().iterator();
+		while (it.hasNext()) {
+			Map.Entry<UUID, HeldOverlay> entry = it.next();
+			HeldOverlay held = entry.getValue();
+			// The last re-send has to happen while there's still a full
+			// vanilla display's worth of time left, or it would overshoot.
+			if (now + OVERLAY_VANILLA_TICKS > held.untilTick()) {
+				it.remove();
+				continue;
+			}
+			if (now < held.nextSendTick()) {
+				continue;
+			}
+			ServerPlayer owner = server.getPlayerList().getPlayer(entry.getKey());
+			if (owner == null) {
+				it.remove();
+				continue;
+			}
+			owner.sendOverlayMessage(held.message());
+			entry.setValue(new HeldOverlay(held.message(), held.untilTick(), now + OVERLAY_RESEND_TICKS));
+		}
+	}
+
+	/** Forget every held message - the server is going away (or a new one is starting in the same JVM). */
+	public static void clearHeldOverlays() {
+		HELD_OVERLAYS.clear();
 	}
 
 	/**

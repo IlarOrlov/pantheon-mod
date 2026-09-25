@@ -8,7 +8,7 @@
 		"HotbarScrollLockMixin",
 		"HotbarNumberKeyLockMixin",
 		"KeyMappingKeyAccessor",
-		"LocatorBarColorMixin",
+		"LocatorBarColorMixin","PickBlockLocationMarkMixin",
 		"TwoHandHotbarHideMixin"
 	],
 	"injectors": {
