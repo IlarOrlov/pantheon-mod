@@ -6,7 +6,8 @@
 		"InventorySharingMixin",
 		"EquipmentSharingMixin",
 		"DeathDropPickupSaveMixin",
-		"HotbarCreativeSlotLockMixin",
+		"CloseContainerResyncMixin",
+		"CreativeSlotSyncMixin",
 		"HotbarInventoryLockMixin",
 		"HotbarLockMixin",
 		"HotbarOwnershipCapMixin",
@@ -14,6 +15,7 @@
 		"HotbarRespawnMixin",
 		"HotbarSelectionCapMixin",
 		"HotbarSlotLockMixin",
+		"MenuPushTimesMixin",
 		"SharedHungerWasteMixin",
 		"UnsharedEquipmentDeathDropMixin"
 	],

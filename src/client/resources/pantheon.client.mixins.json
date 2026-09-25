@@ -4,11 +4,14 @@
 	"compatibilityLevel": "JAVA_25",
 	"client": [
 		"ContainerScreenHoveredSlotAccessor",
+		"CreativeEchoSuppressMixin",
 		"HotbarLockFrameMixin",
 		"HotbarScrollLockMixin",
 		"HotbarNumberKeyLockMixin",
 		"KeyMappingKeyAccessor",
-		"LocatorBarColorMixin","PickBlockLocationMarkMixin",
+		"LocatorBarColorMixin",
+		"MenuLastSlotsAccessor",
+		"PickBlockLocationMarkMixin",
 		"TwoHandHotbarHideMixin"
 	],
 	"injectors": {

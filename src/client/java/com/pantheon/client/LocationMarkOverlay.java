@@ -20,8 +20,9 @@ import net.minecraft.world.phys.Vec3;
  * in its direction, so it can always be found by turning towards it.
  */
 public final class LocationMarkOverlay implements HudElement {
-	private static final int MARKER_RADIUS = 4;
-	private static final int EDGE_MARGIN = 12;
+	private static final int MARKER_RADIUS = 3;
+	private static final float LABEL_SCALE = 0.75F;
+	private static final int EDGE_MARGIN = 10;
 	private static final int OUTLINE_COLOR = 0xFF000000;
 	private static final int TEXT_COLOR = 0xFFFFFFFF;
 
@@ -98,8 +99,14 @@ public final class LocationMarkOverlay implements HudElement {
 			int half = MARKER_RADIUS - Math.abs(dy);
 			graphics.fill(x - half, y + dy, x + half + 1, y + dy + 1, color);
 		}
-		int textWidth = font.width(label);
-		int textX = Math.clamp(x - textWidth / 2, 2, graphics.guiWidth() - textWidth - 2);
-		graphics.text(font, label, textX, y + MARKER_RADIUS + 3, TEXT_COLOR, true);
+		// The label is drawn scaled down, so it stays readable without
+		// covering whatever is being marked.
+		float textWidth = font.width(label) * LABEL_SCALE;
+		float textX = Math.clamp(x - textWidth / 2.0F, 2.0F, graphics.guiWidth() - textWidth - 2.0F);
+		graphics.pose().pushMatrix();
+		graphics.pose().translate(textX, y + MARKER_RADIUS + 3);
+		graphics.pose().scale(LABEL_SCALE, LABEL_SCALE);
+		graphics.text(font, label, 0, 0, TEXT_COLOR, true);
+		graphics.pose().popMatrix();
 	}
 }
