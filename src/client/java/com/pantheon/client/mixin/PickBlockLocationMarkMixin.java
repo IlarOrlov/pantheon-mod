@@ -10,9 +10,9 @@ import com.pantheon.client.LocationMarkClient;
 import net.minecraft.client.Minecraft;
 
 /**
- * Middle-click (the pick-block key) places a location mark when there's
- * nothing in reach to pick, or while sneaking - otherwise vanilla's pick
- * block runs untouched. See {@link LocationMarkClient#shouldMarkInsteadOfPick}.
+ * Middle-click (the pick-block key) places a location mark whenever marks
+ * are on, replacing vanilla's pick block; with marks off, pick block runs
+ * untouched. See {@link LocationMarkClient#shouldMarkInsteadOfPick}.
  */
 @Mixin(Minecraft.class)
 public abstract class PickBlockLocationMarkMixin {

@@ -34,18 +34,9 @@ public final class LocationMarkClient {
 	private LocationMarkClient() {
 	}
 
-	/**
-	 * Whether a middle-click should place a mark instead of vanilla's pick
-	 * block: marks are on, and either there's nothing in reach to pick (the
-	 * click would otherwise do nothing at all) or we're sneaking, to mark
-	 * something close by.
-	 */
+	/** Whether a middle-click should place a mark instead of vanilla's pick block - always, while marks are on. */
 	public static boolean shouldMarkInsteadOfPick(final Minecraft minecraft) {
-		if (minecraft.player == null || !PantheonModClient.getLastKnownConfig().locationMarks) {
-			return false;
-		}
-		HitResult inReach = minecraft.hitResult;
-		return inReach == null || inReach.getType() == HitResult.Type.MISS || minecraft.player.isShiftKeyDown();
+		return minecraft.player != null && PantheonModClient.getLastKnownConfig().locationMarks;
 	}
 
 	public static void placeMark(final Minecraft minecraft) {
@@ -56,12 +47,13 @@ public final class LocationMarkClient {
 			minecraft.player.sendOverlayMessage(Component.literal("Location marks are turned off."));
 			return;
 		}
+		// Looking at open sky still marks something: the far end of the ray,
+		// so a direction can be pointed out even with no block in sight.
 		HitResult hit = minecraft.player.pick(MARK_REACH, 1.0F, false);
-		if (!(hit instanceof BlockHitResult blockHit) || hit.getType() == HitResult.Type.MISS) {
-			minecraft.player.sendOverlayMessage(Component.literal("Nothing to mark there."));
-			return;
-		}
-		ClientPlayNetworking.send(new PlaceLocationMarkPayload(blockHit.getBlockPos()));
+		BlockPos pos = hit instanceof BlockHitResult blockHit && hit.getType() != HitResult.Type.MISS
+			? blockHit.getBlockPos()
+			: BlockPos.containing(hit.getLocation());
+		ClientPlayNetworking.send(new PlaceLocationMarkPayload(pos));
 	}
 
 	public static void onMarkPayload(final LocationMarkPayload payload) {

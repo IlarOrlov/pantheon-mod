@@ -15,13 +15,24 @@ import net.minecraft.world.phys.Vec3;
 
 /**
  * Draws every active location mark ({@link LocationMarkClient}) as a small
- * diamond in its placer's color, with their name and the distance under it.
+ * diamond in its placer's color, with their name and the distance under it,
+ * both drawn larger the nearer the mark is.
  * A mark off screen - or behind us - is pinned to the nearest screen edge
  * in its direction, so it can always be found by turning towards it.
  */
 public final class LocationMarkOverlay implements HudElement {
-	private static final int MARKER_RADIUS = 3;
-	private static final float LABEL_SCALE = 0.75F;
+	/** The diamond is drawn at this radius and then scaled, so it stays a clean shape at any size. */
+	private static final int DRAW_RADIUS = 12;
+	private static final int DRAW_RIM = 3;
+	/** On-screen diamond radius (GUI pixels) for a mark right next to us, and for one far away. */
+	private static final float NEAR_RADIUS = 2.4F;
+	private static final float FAR_RADIUS = 1.2F;
+	/** Label size relative to normal text, near and far. */
+	private static final float NEAR_LABEL_SCALE = 0.6F;
+	private static final float FAR_LABEL_SCALE = 0.45F;
+	/** Distances (blocks) at and past which a mark is drawn at its near/far size - scaled logarithmically between. */
+	private static final double NEAR_DISTANCE = 4.0;
+	private static final double FAR_DISTANCE = 256.0;
 	private static final int EDGE_MARGIN = 10;
 	private static final int OUTLINE_COLOR = 0xFF000000;
 	private static final int TEXT_COLOR = 0xFFFFFFFF;
@@ -78,8 +89,12 @@ public final class LocationMarkOverlay implements HudElement {
 			x = Math.clamp(x, EDGE_MARGIN, width - EDGE_MARGIN);
 			y = Math.clamp(y, EDGE_MARGIN, height - EDGE_MARGIN * 2);
 
+			double distance = offset.length();
+			float t = (float) Math.clamp(Math.log(distance / NEAR_DISTANCE) / Math.log(FAR_DISTANCE / NEAR_DISTANCE), 0.0, 1.0);
 			drawMarker(graphics, minecraft.font, x, y, colorFor(mark.placer()),
-				mark.placerName() + " " + Math.round(offset.length()) + "m");
+				mark.placerName() + " " + Math.round(distance) + "m",
+				NEAR_RADIUS + (FAR_RADIUS - NEAR_RADIUS) * t,
+				NEAR_LABEL_SCALE + (FAR_LABEL_SCALE - NEAR_LABEL_SCALE) * t);
 		}
 	}
 
@@ -88,24 +103,31 @@ public final class LocationMarkOverlay implements HudElement {
 		return color != null ? color : HotbarColors.vanillaColorFor(placer);
 	}
 
-	private static void drawMarker(final GuiGraphicsExtractor graphics, final Font font, final int x, final int y, final int color, final String label) {
-		// A diamond built from horizontal strips, with a one-pixel dark rim so it
-		// reads against both sky and terrain.
-		for (int dy = -MARKER_RADIUS - 1; dy <= MARKER_RADIUS + 1; dy++) {
-			int half = MARKER_RADIUS + 1 - Math.abs(dy);
-			graphics.fill(x - half, y + dy, x + half + 1, y + dy + 1, OUTLINE_COLOR);
+	private static void drawMarker(final GuiGraphicsExtractor graphics, final Font font, final int x, final int y, final int color,
+		final String label, final float radius, final float labelScale) {
+		// A diamond built from horizontal strips, with a dark rim so it reads
+		// against both sky and terrain - drawn large and scaled down to size.
+		float scale = radius / DRAW_RADIUS;
+		graphics.pose().pushMatrix();
+		graphics.pose().translate(x, y);
+		graphics.pose().scale(scale, scale);
+		int outer = DRAW_RADIUS + DRAW_RIM;
+		for (int dy = -outer; dy <= outer; dy++) {
+			int half = outer - Math.abs(dy);
+			graphics.fill(-half, dy, half + 1, dy + 1, OUTLINE_COLOR);
 		}
-		for (int dy = -MARKER_RADIUS; dy <= MARKER_RADIUS; dy++) {
-			int half = MARKER_RADIUS - Math.abs(dy);
-			graphics.fill(x - half, y + dy, x + half + 1, y + dy + 1, color);
+		for (int dy = -DRAW_RADIUS; dy <= DRAW_RADIUS; dy++) {
+			int half = DRAW_RADIUS - Math.abs(dy);
+			graphics.fill(-half, dy, half + 1, dy + 1, color);
 		}
+		graphics.pose().popMatrix();
 		// The label is drawn scaled down, so it stays readable without
 		// covering whatever is being marked.
-		float textWidth = font.width(label) * LABEL_SCALE;
+		float textWidth = font.width(label) * labelScale;
 		float textX = Math.clamp(x - textWidth / 2.0F, 2.0F, graphics.guiWidth() - textWidth - 2.0F);
 		graphics.pose().pushMatrix();
-		graphics.pose().translate(textX, y + MARKER_RADIUS + 3);
-		graphics.pose().scale(LABEL_SCALE, LABEL_SCALE);
+		graphics.pose().translate(textX, y + radius * outer / DRAW_RADIUS + 2.0F);
+		graphics.pose().scale(labelScale, labelScale);
 		graphics.text(font, label, 0, 0, TEXT_COLOR, true);
 		graphics.pose().popMatrix();
 	}
