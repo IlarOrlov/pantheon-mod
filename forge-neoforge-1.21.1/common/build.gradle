@@ -1,0 +1,36 @@
+// Loader-independent code, compiled against plain vanilla Minecraft. Never
+// shipped on its own: both loader jars compile these sources in.
+plugins {
+    id 'pantheon-common'
+    id 'net.neoforged.moddev'
+}
+
+neoForge {
+    neoFormVersion = neo_form_version
+    parchment {
+        minecraftVersion = parchment_minecraft
+        mappingsVersion = parchment_version
+    }
+}
+
+dependencies {
+    compileOnly group: 'org.spongepowered', name: 'mixin', version: '0.8.5'
+    // Opcodes for FIELD injection points; both loaders ship ASM at runtime.
+    compileOnly group: 'org.ow2.asm', name: 'asm', version: '9.7'
+}
+
+configurations {
+    commonJava {
+        canBeResolved = false
+        canBeConsumed = true
+    }
+    commonResources {
+        canBeResolved = false
+        canBeConsumed = true
+    }
+}
+
+artifacts {
+    commonJava sourceSets.main.java.sourceDirectories.singleFile
+    commonResources sourceSets.main.resources.sourceDirectories.singleFile
+}

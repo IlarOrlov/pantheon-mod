@@ -1,0 +1,27 @@
+modLoader = "javafml"
+loaderVersion = "${forge_loader_version_range}"
+license = "${license}"
+issueTrackerURL = "https://github.com/IlarOrlov/pantheon-mod/issues"
+
+[[mods]]
+modId = "${mod_id}"
+version = "${version}"
+displayName = "${mod_name}"
+authors = "${mod_author}"
+displayURL = "https://github.com/IlarOrlov/pantheon-mod"
+logoFile = "assets/pantheon/icon.png"
+description = '''One inventory, shared by every player on the server. Everyone reads and writes the same 36 storage slots, and optionally the crafting grid, armor and offhand too. Optionally, each hotbar slot can be exclusively owned by one player at a time (shown as a colored frame around it) so nobody else can touch it while they're using it. Configurable via the /pantheon command or the in-game settings screen.'''
+
+[[dependencies.${mod_id}]]
+modId = "forge"
+mandatory = true
+versionRange = "[${forge_version},)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.${mod_id}]]
+modId = "minecraft"
+mandatory = true
+versionRange = "${minecraft_version_range}"
+ordering = "NONE"
+side = "BOTH"

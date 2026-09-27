@@ -1,0 +1,28 @@
+{
+	"required": true,
+	"minVersion": "0.8",
+	"package": "com.pantheon.mixin",
+	"compatibilityLevel": "JAVA_21",
+	"mixins": [
+		"InventorySharingMixin",
+		"DeathDropPickupSaveMixin",
+		"CloseContainerResyncMixin",
+		"CreativeSlotSyncMixin",
+		"HotbarInventoryLockMixin",
+		"HotbarLockMixin",
+		"HotbarOwnershipCapMixin",
+		"HotbarPickItemLockMixin",
+		"HotbarRespawnMixin",
+		"HotbarSelectionCapMixin",
+		"HotbarSlotLockMixin",
+		"MenuPushTimesMixin",
+		"PlayerDeathMixin",
+		"ServerPlayerInventorySharingMixin",
+		"SharedHungerWasteMixin",
+		"UnsharedEquipmentDeathDropMixin",
+		"WorldSaveMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

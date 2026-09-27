@@ -2,7 +2,7 @@
 
 # Pantheon
 
-A [Fabric](https://fabricmc.net/) mod for Minecraft that gives every player on the server **one shared inventory**. Storage and hotbar are always shared; armor and offhand can be too. Pick something up as one player, and it's instantly available to the rest of the party.
+A Minecraft mod that gives every player on the server **one shared inventory**, available for [Fabric](https://fabricmc.net/) on Minecraft 26.3 and for [Forge](https://minecraftforge.net/) and [NeoForge](https://neoforged.net/) on Minecraft 1.21.1 - all three have the same features and settings. Storage and hotbar are always shared; armor and offhand can be too. Pick something up as one player, and it's instantly available to the rest of the party.
 
 ## Features
 
@@ -50,20 +50,39 @@ Which teams exist and each player's assignment are saved to `config/pantheon-tea
 
 ## Requirements
 
-| | |
-|---|---|
-| Minecraft | 26.3 |
-| Fabric Loader | ≥ 0.19.5 |
-| Fabric API | required |
-| Java | ≥ 25 |
+| | Fabric | Forge | NeoForge |
+|---|---|---|---|
+| Minecraft | 26.3 | 1.21.1 | 1.21.1 |
+| Loader | Fabric Loader ≥ 0.19.5 + Fabric API | Forge ≥ 52.1.16 | NeoForge ≥ 21.1.252 |
+| Java | ≥ 25 | ≥ 21 | ≥ 21 |
+| Jar | `pantheon-1.5.2.jar` | `pantheon-forge-1.21.1-1.5.2.jar` | `pantheon-neoforge-1.21.1-1.5.2.jar` |
 
 ## Installation
 
-1. Install [Fabric Loader](https://fabricmc.net/use/) for Minecraft 26.3.
-2. Download [Fabric API](https://modrinth.com/mod/fabric-api) for the same version.
-3. Grab the latest `pantheon-*.jar` from [Releases](https://github.com/IlarOrlov/pantheon-mod/releases) and drop it into your server's (or client's, for singleplayer/LAN) `mods` folder.
+1. Install the loader for your Minecraft version: [Fabric Loader](https://fabricmc.net/use/) (plus [Fabric API](https://modrinth.com/mod/fabric-api)), [Forge](https://files.minecraftforge.net/net/minecraftforge/forge/index_1.21.1.html) or [NeoForge](https://neoforged.net/).
+2. Grab the matching jar (see the table above) from [Releases](https://github.com/IlarOrlov/pantheon-mod/releases) and drop it into your server's (or client's, for singleplayer/LAN) `mods` folder.
 
-The mod needs to be installed on the server for multiplayer; clients need it too, to see the shared hotbar's colored lock frames and to use the settings screen.
+The mod needs to be installed on the server for multiplayer; clients need it too, to see the shared hotbar's colored lock frames and to use the settings screen. A player without it can still join a Pantheon server (the sharing itself is all server-side), and a Pantheon client can still join a server without it.
+
+## Repository layout
+
+```
+fabric-26.3/             Fabric mod for Minecraft 26.3 (Fabric Loom)
+forge-neoforge-1.21.1/   Forge + NeoForge mods for Minecraft 1.21.1
+  common/                all the mod's logic, mixins, HUD and settings screen - loader-independent
+  forge/                 Forge entrypoint, networking channel and event wiring
+  neoforge/              NeoForge entrypoint, payload registration and event wiring
+  buildSrc/              shared Gradle conventions; each loader jar compiles common/ into itself
+```
+
+Each folder is a standalone Gradle project with its own wrapper:
+
+```sh
+cd fabric-26.3 && ./gradlew build            # JDK 25 -> build/libs/
+cd forge-neoforge-1.21.1 && ./gradlew build  # JDK 21 -> forge/build/libs/ and neoforge/build/libs/
+```
+
+For testing, `forge-neoforge-1.21.1` has `runClient`, `runClient2` (logs in as `Player2`) and `runServer` for each loader, e.g. `./gradlew :neoforge:runServer`, each in its own folder under `<loader>/runs/`.
 
 ## How it works
 
@@ -83,7 +102,7 @@ The gameplay-HUD lock frames (`HotbarOwnerOverlay`, via `PantheonModClient#effec
 
 Health and hunger aren't a shared reference the way inventory slots are — each player's is their own synced value — so `SharedStats` instead polls once a server tick, per team: whichever online teammate's value no longer matches what was last synced to them is treated as the source of a fresh change (damage, healing, eating, or a fresh join adopting the existing pool), and that value is applied to the rest of the team. A shared-health pool reaching 0 kills every online teammate through the real death pipeline (`setHealth(0)` + `LivingEntity#die`, not `Entity#kill` - that one only force-removes the entity and never presents a respawn screen). The teammate whose own damage actually emptied the pool dies normally; everyone else on the team who goes down purely because the pool did gets a random joke death message instead (`FunnyMessages`), since nothing actually hit them. The team's shared inventory is dropped and cleared exactly once for the whole event, not once per dying player, since `keepInventory` staying forced on would otherwise just let a wipe that's supposed to end the run survive it anyway. A freshly-joined player's health can briefly read as an uninitialized `0.0` for a tick or two before Minecraft properly sets it - since that's indistinguishable from a real death by value alone, a brand new player is never treated as a change source (or even tracked at all) until their health is observed to be a real, positive number at least once. A player who's still dead and awaiting their own respawn click is tracked against their own real (still-0) health rather than whatever the pool's current value is - otherwise, the moment anyone else revives, every still-dead player's tracked baseline would silently jump to that healthy number while their actual health stays 0, and the next tick would read that mismatch as a brand new death that never happened. That same tracked-baseline check also catches the reverse case: a single player transitioning from their own tracked 0 (dead) to a real positive health (they just respawned) is deliberately *not* treated as the source of a fresh change, even though the value differs - vanilla always hands a respawning player full health regardless of what the shared pool currently is, so treating that as a genuine change would heal every other, already-damaged teammate back up to full just because this one player finally got around to respawning. Instead that player is left to adopt whatever the pool's current value already is, same as any other still-catching-up teammate. Shared XP (`syncExperience`) follows the exact same detection pattern as hunger, copying `experienceLevel`/`experienceProgress` directly across the team via `ServerPlayer#setExperienceLevels`/`setExperiencePoints` rather than converting through a combined "total XP" number, so a level-up shows up for teammates exactly as it happened.
 
-The "request slot" ping is a small serverbound packet (`RequestSlotPayload`) sent when the local player presses the key while hovering (via an `@Accessor` mixin exposing `AbstractContainerScreen#hoveredSlot`) a hotbar slot in their own inventory row that the server-authoritative owner list says is locked to someone else; if hotbar ownership is off, no screen is open, or the hovered slot isn't actually locked to anyone, the client explains that locally instead of doing nothing silently. Since an open container screen can consume a key press before it reaches `KeyMapping`'s own click-tracking, the ping key is also polled by its raw physical state each tick (`InputConstants.isKeyDown` for a keyboard key, `GLFW.glfwGetMouseButton` for a mouse button, via an `@Accessor` mixin exposing `KeyMapping#key`) with its own rising-edge detection, as a backstop so it can't silently stop responding while an inventory is open, regardless of which kind of input it's bound to. The server independently re-verifies the slot really is locked to someone else on the sender's team - and separately re-checks the intended recipient really is on that same team, so a ping can never reach a player on a different one even if the owner-lookup logic changes later - enforces a per-player cooldown (`Team#lastPingTick`), and relays a random joke line to the owner's actionbar (`ServerPlayer#sendOverlayMessage`) - it never touches the slot itself. The low-health warning is entirely client-side: a `HudElement` that reads the local player's own health each frame and tints the screen (with a rotating caption from the same joke pool used elsewhere) once it drops under 3 hearts, gated by a small client-only config file that's never sent to the server.
+The "request slot" ping is a small serverbound packet (`RequestSlotPayload`) sent when the local player presses the key while hovering (via an `@Accessor` mixin exposing `AbstractContainerScreen#hoveredSlot`) a hotbar slot in their own inventory row that the server-authoritative owner list says is locked to someone else; if hotbar ownership is off, no screen is open, or the hovered slot isn't actually locked to anyone, the client explains that locally instead of doing nothing silently. Since an open container screen can consume a key press before it reaches `KeyMapping`'s own click-tracking, the ping key is also polled by its raw physical state each tick (`InputConstants.isKeyDown` for a keyboard key, `GLFW.glfwGetMouseButton` for a mouse button, via an `@Accessor` mixin exposing `KeyMapping#key`) with its own rising-edge detection, as a backstop so it can't silently stop responding while an inventory is open, regardless of which kind of input it's bound to. The server independently re-verifies the slot really is locked to someone else on the sender's team - and separately re-checks the intended recipient really is on that same team, so a ping can never reach a player on a different one even if the owner-lookup logic changes later - enforces a per-player cooldown (`Team#lastPingTick`), and relays a random joke line to the owner's actionbar (`ServerPlayer#sendOverlayMessage`) - it never touches the slot itself. The low-health warning is entirely client-side: a HUD layer that reads the local player's own health each frame and tints the screen (with a rotating caption from the same joke pool used elsewhere) once it drops under 3 hearts, gated by a small client-only config file that's never sent to the server.
 
 ## License
 

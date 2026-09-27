@@ -1,0 +1,123 @@
+package com.pantheon.mixin;
+
+import java.util.List;
+import java.util.UUID;
+
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+
+import com.pantheon.HotbarOwnership;
+import com.pantheon.PantheonConfig;
+import com.pantheon.Team;
+import com.pantheon.TeamManager;
+
+import net.minecraft.network.protocol.game.ClientboundSetCarriedItemPacket;
+import net.minecraft.network.protocol.game.ServerboundPickItemPacket;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.network.ServerGamePacketListenerImpl;
+import net.minecraft.world.item.ItemStack;
+
+/**
+ * "Pick block" (middle-click a block or entity to grab a matching item from
+ * the inventory in Survival) writes straight into whichever hotbar slot
+ * {@code Inventory#getSuitableHotbarSlot} picks - the first empty one
+ * starting from whatever's currently selected, wrapping across all 9 -
+ * through {@code Inventory#pickSlot}, which goes nowhere near
+ * {@code AbstractContainerMenu#clicked}. {@link HotbarLockMixin}'s
+ * protection (built entirely around that one method) never sees this at all,
+ * so a blanked two-hand-mode slot - typically empty, exactly what makes a
+ * slot "suitable" - was free to be picked into like any other, items and
+ * all. (Creative's pick block arrives as a creative slot write instead,
+ * which {@code CreativeSlotSyncMixin} already refuses for locked slots.)
+ *
+ * <p>Same snapshot-and-revert backstop as {@code HotbarLockMixin}'s second
+ * layer, wrapping this entirely different vanilla entry point instead: the
+ * inventory and the player's selected slot (also moved as a side effect of
+ * {@code pickSlot}) are captured before {@code handlePickItem} runs, and
+ * rolled back - selection included - if a locked slot ended up changed.
+ */
+@Mixin(ServerGamePacketListenerImpl.class)
+public abstract class HotbarPickItemLockMixin {
+	@Shadow
+	public ServerPlayer player;
+
+	@Unique
+	private ItemStack[] pantheon$before;
+
+	@Unique
+	private List<UUID> pantheon$beforeOwners;
+
+	@Unique
+	private int pantheon$beforeSelectedSlot;
+
+	@Inject(method = "handlePickItem", at = @At("HEAD"))
+	private void pantheon$capture(final ServerboundPickItemPacket packet, final CallbackInfo ci) {
+		this.pantheon$before = null;
+		// Packet handlers first run on the network thread just to hop over to
+		// the server thread - only act on the real (server-thread) pass.
+		if (!((ServerLevel) this.player.level()).getServer().isSameThread()) {
+			return;
+		}
+
+		PantheonConfig config = PantheonConfig.get();
+		if (!config.enableHotbarOwnership && !config.twoHandSlotMode) {
+			return;
+		}
+
+		Team team = TeamManager.teamOf(this.player);
+		// The whole 36-slot inventory, not just the hotbar: pickSlot's
+		// source (an existing matching stack) is just as often one of the
+		// other 27 slots, and restoring only the hotbar destination after
+		// vanilla already emptied that source would lose the item outright.
+		ItemStack[] snapshot = new ItemStack[team.items.size()];
+		for (int i = 0; i < snapshot.length; i++) {
+			snapshot[i] = team.items.get(i).copy();
+		}
+		this.pantheon$before = snapshot;
+		// Ownership as it stood before the pick: afterwards, a player who
+		// just moved onto someone else's slot would turn it into a tie -
+		// "unowned" - and hide the very violation being checked for.
+		this.pantheon$beforeOwners = config.enableHotbarOwnership ? HotbarOwnership.currentOwnersFor(this.player) : null;
+		this.pantheon$beforeSelectedSlot = this.player.getInventory().selected;
+	}
+
+	@Inject(method = "handlePickItem", at = @At("RETURN"))
+	private void pantheon$revert(final ServerboundPickItemPacket packet, final CallbackInfo ci) {
+		ItemStack[] before = this.pantheon$before;
+		this.pantheon$before = null;
+		if (before == null) {
+			return;
+		}
+
+		PantheonConfig config = PantheonConfig.get();
+		List<UUID> owners = this.pantheon$beforeOwners;
+		Team team = TeamManager.teamOf(this.player);
+
+		// Pick block on a hotbar item just selects that slot - no item moves
+		// at all - so landing on someone else's owned slot has to be caught
+		// by the selection itself, not by comparing contents.
+		boolean violated = HotbarOwnership.isLocked(this.player.getInventory().selected, owners, this.player, config);
+		for (int i = 0; i < before.length && !violated; i++) {
+			if (HotbarOwnership.isLocked(i, owners, this.player, config) && !ItemStack.matches(before[i], team.items.get(i))) {
+				violated = true;
+			}
+		}
+
+		if (!violated) {
+			return;
+		}
+
+		for (int i = 0; i < before.length; i++) {
+			team.items.set(i, before[i]);
+		}
+		this.player.getInventory().selected = this.pantheon$beforeSelectedSlot;
+		// Vanilla already told the client about the new selection.
+		this.player.connection.send(new ClientboundSetCarriedItemPacket(this.pantheon$beforeSelectedSlot));
+		this.player.inventoryMenu.broadcastFullState();
+	}
+}

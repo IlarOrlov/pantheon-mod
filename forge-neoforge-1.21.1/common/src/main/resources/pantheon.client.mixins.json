@@ -1,0 +1,21 @@
+{
+	"required": true,
+	"minVersion": "0.8",
+	"package": "com.pantheon.client.mixin",
+	"compatibilityLevel": "JAVA_21",
+	"client": [
+		"ContainerScreenHoveredSlotAccessor",
+		"CreativeEchoSuppressMixin",
+		"HotbarLockFrameMixin",
+		"HotbarScrollLockMixin",
+		"HotbarNumberKeyLockMixin",
+		"KeyMappingKeyAccessor",
+		"MenuLastSlotsAccessor",
+		"PickBlockLocationMarkMixin",
+		"TwoHandHotbarHideMixin",
+		"WorldProjectionCaptureMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

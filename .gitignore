@@ -28,9 +28,10 @@ bin/
 
 *.DS_Store
 
-# fabric
+# game run directories
 
 run/
+runs/
 
 # java
 

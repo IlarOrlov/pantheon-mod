@@ -1,14 +1,17 @@
-# Automatically build the project and run any configured tests for every push
-# and submitted pull request. This can help catch issues that only occur on
-# certain platforms or Java versions, and provides a first line of defence
-# against bad commits.
+# Automatically build every version of the mod for every push and submitted
+# pull request. This can help catch issues that only occur on certain
+# platforms or Java versions, and provides a first line of defence against
+# bad commits.
 
 name: build
 on: [pull_request, push]
 
 jobs:
-  build:
+  fabric-26_3:
     runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: fabric-26.3
     steps:
       - name: checkout repository
         uses: actions/checkout@v6
@@ -26,5 +29,32 @@ jobs:
       - name: capture build artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: Artifacts
-          path: build/libs/
+          name: pantheon-fabric-26.3
+          path: fabric-26.3/build/libs/
+
+  forge-neoforge-1_21_1:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: forge-neoforge-1.21.1
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v6
+      - name: validate gradle wrapper
+        uses: gradle/actions/wrapper-validation@v6
+      - name: setup jdk
+        uses: actions/setup-java@v5
+        with:
+          java-version: '21'
+          distribution: 'microsoft'
+      - name: make gradle wrapper executable
+        run: chmod +x ./gradlew
+      - name: build
+        run: ./gradlew build
+      - name: capture build artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: pantheon-forge-neoforge-1.21.1
+          path: |
+            forge-neoforge-1.21.1/forge/build/libs/
+            forge-neoforge-1.21.1/neoforge/build/libs/

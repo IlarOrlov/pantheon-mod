@@ -1,0 +1,34 @@
+plugins {
+    id 'pantheon-loader'
+    id 'net.neoforged.moddev'
+}
+
+neoForge {
+    version = neoforge_version
+    parchment {
+        minecraftVersion = parchment_minecraft
+        mappingsVersion = parchment_version
+    }
+    runs {
+        // Separate game directories, so a server and two clients can run side by side.
+        client {
+            client()
+            gameDirectory = file('runs/client')
+        }
+        client2 {
+            client()
+            gameDirectory = file('runs/client2')
+            programArguments.addAll '--username', 'Player2'
+        }
+        server {
+            server()
+            gameDirectory = file('runs/server')
+            programArgument '--nogui'
+        }
+    }
+    mods {
+        "${mod_id}" {
+            sourceSet sourceSets.main
+        }
+    }
+}
